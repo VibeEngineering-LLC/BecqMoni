@@ -750,6 +750,20 @@ namespace BecquerelMonitor
                                 this.ActiveDeviceConfig.ChannelPitch = 1;
                                 break;
                             }
+                        case AtomSpectraTcpDeviceConfig.DeviceTypeId:
+                            {
+                                // read the calibration from the device (-cal); writing it over TCP is not offered
+                                this.button13.Enabled = true;
+                                this.button13.Visible = true;
+                                this.button14.Enabled = false;
+                                this.button14.Visible = false;
+
+                                this.integerTextBox1.Enabled = true;
+                                this.doubleTextBox6.Enabled = false;
+                                this.doubleTextBox6.Text = "1";
+                                this.ActiveDeviceConfig.ChannelPitch = 1;
+                                break;
+                            }
                         case "AmplitudaUSB":
                             {
                                 // no device-side calibration to read or write
@@ -2121,6 +2135,15 @@ namespace BecquerelMonitor
                     MessageBox.Show(Resources.ERRReadDataFromPort_Empty);
                 }
             }
+            else if (this.activeDeviceConfig.DeviceType == AtomSpectraTcpDeviceConfig.DeviceTypeId)
+            {
+                // AtomSpectra TCP: read-only -cal on a worker thread (AtomSpectraTcpCalibrationReader).
+                DeviceConfigInfo asked = this.activeDeviceConfig;
+                AtomSpectraTcpCalibrationReader.ReadIntoFormAsync((AtomSpectraTcpDeviceConfig)asked.InputDeviceConfig, this, this.button13,
+                    () => ReferenceEquals(asked, this.activeDeviceConfig), () => (PolynomialEnergyCalibration)asked.EnergyCalibration,
+                    new System.Windows.Forms.Control[] { this.numericUpDown7, this.numericUpDown2, this.numericUpDown1, this.numericUpDown9, this.numericUpDown8 },
+                    SetActiveDeviceConfigDirty);
+            }
         }
 
         void button14_Click(object sender, EventArgs e)
@@ -2479,6 +2502,16 @@ namespace BecquerelMonitor
             }
             this.activeDeviceConfig.Dirty = false;
             this.button6.Enabled = false;
+        }
+
+        // 2026-10-16 (operator): the AtomSpectra TCP/REST device page puts the board calibration on the Energy Calibration page
+        // after its own "Test connection (REST)" / "Refresh" - the same fill as "Read from device" (button13), saved with the config.
+        public void ApplyAtomSpectraCalibration(double[] coefficients)
+        {
+            if (this.activeDeviceConfig == null || coefficients == null || coefficients.Length < 2) return;
+            AtomSpectraTcpCalibrationReader.ApplyToFields((PolynomialEnergyCalibration)this.activeDeviceConfig.EnergyCalibration, coefficients,
+                new System.Windows.Forms.Control[] { this.numericUpDown7, this.numericUpDown2, this.numericUpDown1, this.numericUpDown9, this.numericUpDown8 });
+            this.SetActiveDeviceConfigDirty();
         }
 
         // Token: 0x06000534 RID: 1332 RVA: 0x000219B4 File Offset: 0x0001FBB4
