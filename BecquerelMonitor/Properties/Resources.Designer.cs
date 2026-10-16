@@ -8053,6 +8053,15 @@ namespace BecquerelMonitor.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to All, with debug (device answers; may contain the serial number)
+        /// </summary>
+        public static string AtomSpectraTcpLogFilterDebug {
+            get {
+                return ResourceManager.GetString("AtomSpectraTcpLogFilterDebug", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Password / token :.
         /// </summary>
         public static string AtomSpectraRestAuthSecret {

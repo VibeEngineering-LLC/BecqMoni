@@ -44244,6 +44244,9 @@ The setting is saved on the board and applies to all its clients. Do not change 
   <data name="AtomSpectraRestNoCompression" xml:space="preserve">
     <value>; spectrum reply not compressed ({0} B; the board compresses in the background, the first reply after its cache refresh is plain)</value>
   </data>
+  <data name="AtomSpectraTcpLogFilterDebug" xml:space="preserve">
+    <value>All, with debug (device answers; may contain the serial number)</value>
+  </data>
   <data name="AtomSpectraRestTest" xml:space="preserve">
     <value>Test connection (REST)</value>
   </data>

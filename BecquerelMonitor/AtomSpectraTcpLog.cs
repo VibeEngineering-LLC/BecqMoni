@@ -11,7 +11,8 @@ namespace BecquerelMonitor
     {
         Info,
         Warn,
-        Error
+        Error,
+        Debug   // 2026-10-16 (operator): device answers (-inf may carry the serial); the log window hides it by default
     }
 
     public sealed class AtomSpectraTcpLogLine
@@ -41,6 +42,9 @@ namespace BecquerelMonitor
                     break;
                 case AtomSpectraTcpLogLevel.Error:
                     levelTag = "ERROR";
+                    break;
+                case AtomSpectraTcpLogLevel.Debug:
+                    levelTag = "DEBUG";
                     break;
                 default:
                     levelTag = "INFO";
@@ -132,6 +136,11 @@ namespace BecquerelMonitor
         public static AtomSpectraTcpLogLine Error(string source, string text)
         {
             return Add(AtomSpectraTcpLogLevel.Error, source, text);
+        }
+
+        public static AtomSpectraTcpLogLine Debug(string source, string text)
+        {
+            return Add(AtomSpectraTcpLogLevel.Debug, source, text);
         }
 
         public static List<AtomSpectraTcpLogLine> Snapshot()

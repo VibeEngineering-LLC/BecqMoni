@@ -3009,6 +3009,9 @@ http://xptable.sourceforge.net/</value>
   <data name="AtomSpectraRestNoCompression" xml:space="preserve">
     <value>; ответ со спектром без сжатия ({0} Б; плата сжимает в фоне, первый ответ после обновления её кэша идёт несжатым)</value>
   </data>
+  <data name="AtomSpectraTcpLogFilterDebug" xml:space="preserve">
+    <value>Всё, с отладкой (ответы прибора; может быть серийный номер)</value>
+  </data>
   <data name="AtomSpectraRestTest" xml:space="preserve">
     <value>Проверить связь (REST)</value>
   </data>

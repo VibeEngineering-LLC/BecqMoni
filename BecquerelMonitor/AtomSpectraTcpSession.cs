@@ -400,6 +400,8 @@ namespace BecquerelMonitor
             acquisition.SendCommand(command);
             string answer = acquisition.GetCommandOutput(timeoutMs);
             AtomSpectraTcpLog.Info("TCP", "sent " + command + ": " + (answer == null ? "no answer" : answer.Length + " chars"));
+            if (answer != null)   // 2026-10-16 (operator): the text itself only at Debug (hidden by default): -inf may carry the serial
+                AtomSpectraTcpLog.Debug("TCP", "answer to " + command + ": " + answer.Trim().Replace("\r\n", " | ").Replace("\n", " | ").Replace("\r", " | "));
             return answer;
         }
 
