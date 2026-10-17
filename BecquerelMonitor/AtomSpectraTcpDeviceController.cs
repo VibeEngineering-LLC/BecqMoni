@@ -334,19 +334,7 @@ namespace BecquerelMonitor
                 channels = data.DeviceConfig != null ? data.DeviceConfig.NumberOfChannels : 0;
             }
 
-            AtomSpectraRestDataReadyArgs rest = e as AtomSpectraRestDataReadyArgs;
-            if (rest != null && restChannels > 0)
-            {
-                channels = restChannels;   // pass B N12: fixed at Start, a config edit during the run does not apply
-            }
-            int[] hist = AtomSpectraTcpAcquisition.Compress(e.Histogram, channels);
-            // The REST snapshot carries the board's own live time: keep it through the compression.
-            AtomSpectraTcpDataReadyArgs args = rest != null
-                ? new AtomSpectraRestDataReadyArgs(hist, e.CpuLoad, e.ElapsedTime, e.InvalidPulses, e.Cps, rest.LiveSeconds, rest.Total,
-                    rest.SpectrometerSilent, rest.HistOk, rest.Calibration)
-                : new AtomSpectraTcpDataReadyArgs(hist, e.CpuLoad, e.ElapsedTime, e.InvalidPulses, e.Cps);
-            AtomSpectraRestDataReadyArgs restArgs = args as AtomSpectraRestDataReadyArgs;
-            if (restArgs != null) restArgs.CalibChannels = rest.CalibChannels;   // F5 (plan K4): the scale of "calib"
+            AtomSpectraTcpDataReadyArgs args = BuildArgs(e, channels, restChannels);   // F5 fix: a static method, tested without a window
             IAtomSpectraSession s = session;
             if (s != null)
             {
@@ -357,6 +345,21 @@ namespace BecquerelMonitor
             {
                 MainForm.originalContext.Post(d => UpdateHistogram(args), null);
             }
+        }
+
+        // The snapshot for the document: folded to the profile's channels; a REST snapshot is folded to restChannels (fixed at Start,
+        // pass B N12: a config edit during the run does not apply) and keeps the board's own live time, hist_ok, "calib" and the scale
+        // of that "calib" (F5, plan K4: calib_channels).
+        internal static AtomSpectraTcpDataReadyArgs BuildArgs(AtomSpectraTcpDataReadyArgs e, int channels, int restChannels)
+        {
+            AtomSpectraRestDataReadyArgs rest = e as AtomSpectraRestDataReadyArgs;
+            if (rest != null && restChannels > 0) channels = restChannels;
+            int[] hist = AtomSpectraTcpAcquisition.Compress(e.Histogram, channels);
+            if (rest == null) return new AtomSpectraTcpDataReadyArgs(hist, e.CpuLoad, e.ElapsedTime, e.InvalidPulses, e.Cps);
+            AtomSpectraRestDataReadyArgs copy = new AtomSpectraRestDataReadyArgs(hist, e.CpuLoad, e.ElapsedTime, e.InvalidPulses, e.Cps,
+                rest.LiveSeconds, rest.Total, rest.SpectrometerSilent, rest.HistOk, rest.Calibration);
+            copy.CalibChannels = rest.CalibChannels;
+            return copy;
         }
 
         private void UpdateHistogram(AtomSpectraTcpDataReadyArgs e)

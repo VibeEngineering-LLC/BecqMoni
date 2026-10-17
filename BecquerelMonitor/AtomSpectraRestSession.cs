@@ -461,9 +461,13 @@ namespace BecquerelMonitor
                 return false;
             }
 
-            AtomSpectraRestResponse r = client.Reset(commandTimeoutMs);
+            guard.ExpectOwnReset();   // P1-1: polling goes on while the request is in flight; a new epoch in that window is OUR reset's answer
+            AtomSpectraRestResponse r;
+            try { r = client.Reset(commandTimeoutMs); }
+            catch { guard.CancelOwnReset(); throw; }
             if (r.Accepted && r.SentFalse)
             {
+                guard.CancelOwnReset();
                 // pass C 7: the board answered but the analyzer did not get -rst - the spectrum is not cleared
                 lastError = "the board answered sent=false: the analyzer did not get the reset";
                 Failure = AtomSpectraRestFailure.ResetRefused;
@@ -472,13 +476,14 @@ namespace BecquerelMonitor
             }
             if (r.Accepted)
             {
-                guard.AcceptReset();
+                guard.ConfirmOwnReset();
                 resetReported = false;
                 stallReported = false;
                 AtomSpectraTcpLog.Info("Session", "Clear: board reset");
                 return true;
             }
 
+            guard.CancelOwnReset();
             lastError = r.Error ?? ("answered " + r.Status + " " + r.Body);
             Failure = AtomSpectraRestFailure.ResetRefused;
             // [clear failed]
@@ -564,7 +569,7 @@ namespace BecquerelMonitor
             if (guard.EpochChanges != epochChangesSeen)
             {
                 epochChangesSeen = guard.EpochChanges;   // F5 (plan K2): logged once per change
-                AtomSpectraTcpLog.Info("Session", "new acquisition on the board (" + guard.LastEpochChange + "): a new session, no Trip; the document follows the board");
+                AtomSpectraTcpLog.Info("Session", "board epoch changed (" + guard.LastEpochChange + "): the board was reset from outside");
             }
             if (u == AtomSpectraRestUpdate.Apply)
             {
@@ -589,7 +594,8 @@ namespace BecquerelMonitor
             }
 
             AtomSpectraRestAcquisition acq = acquisition;
-            if (!stallReported && acq != null && guard.Stalled(acq.NowMs, StallMs))
+            // finding 3: a 404 tells nothing about growth, and after skipped polls (doubled period) the last growth is long ago
+            if (u != AtomSpectraRestUpdate.NoData && !stallReported && acq != null && guard.Stalled(acq.NowMs, StallMs))
             {
                 stallReported = true;
                 AtomSpectraTcpLog.Warn("Session", "the board stopped counting (no growth for " + (StallMs / 1000) + " s); polling stops, nothing is sent");

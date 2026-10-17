@@ -202,7 +202,7 @@ namespace BecquerelMonitor
                     calib)
                 {
                     Channels = declared,
-                    CalibChannels = calibChannels.HasValue && calibChannels.Value > 0 ? (int)calibChannels.Value : Channels,
+                    CalibChannels = calibChannels.HasValue && calibChannels.Value > 0 && calibChannels.Value <= int.MaxValue ? (int)calibChannels.Value : Channels,
                     Epoch = epoch.Any ? epoch : null
                 };
             }
@@ -400,14 +400,16 @@ namespace BecquerelMonitor
                     Interlocked.Increment(ref _failures);
                     int cf = Interlocked.Increment(ref _consecutiveFailures);
                     _lastError = error;
+                    int periodInForce = _period.EffectiveMs;   // the period this poll was scheduled with, before the doubling below
                     // F5 (B6): missed deadline, transport error or an answer that did not parse = a skipped poll: no Trip
                     PeriodAfter(false);
 
                     AtomSpectraTcpLog.Warn("REST", "poll failed (" + cf + " in a row): " + error);
 
-                    // F5: also by the time without an answer, 3 CONFIGURED periods, so the B6 doubling does not delay the loss
+                    // F5: also by the time without an answer: 3 periods, the larger of the configured one and the one in force
+                    // (finding 2: with the period doubled by skipped polls, 3 configured periods are only 1-2 polls)
                     long silentMs = NowMs - Interlocked.Read(ref _lastAnsweredMs);
-                    bool silent = silentMs >= 3L * _periodMs;
+                    bool silent = silentMs >= 3L * Math.Max(_periodMs, periodInForce);
                     if ((cf == LinkLostAfterFailures || silent) && !_linkLost)
                     {
                         _linkLost = true;
@@ -507,7 +509,7 @@ namespace BecquerelMonitor
                 cps = _last.Cps;
             }
 
-            string msg = "REST stats: period " + (_periodMs / 1000) + " s, polls " + attempts +
+            string msg = "REST stats: period " + (_period.EffectiveMs / 1000.0).ToString(CultureInfo.InvariantCulture) + " s (configured " + (_periodMs / 1000) + " s), polls " + attempts +
                          " (ok " + successes + ", failed " + failures + "), last response " + wireBytes +
                          " B (" + encoding + "), last total " + total +
                          ", time " + time.ToString(CultureInfo.InvariantCulture) + " s, live " +
