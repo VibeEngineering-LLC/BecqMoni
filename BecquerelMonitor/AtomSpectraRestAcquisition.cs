@@ -14,6 +14,10 @@ namespace BecquerelMonitor
         public bool SpectrometerSilent { get; private set; }
         public long HistOk { get; private set; }            // "hist_ok": monotonic until a reboot
         public double[] Calibration { get; private set; }   // "calib" (up to 5 slots) when "calib_set", else null
+        // F5 (plan K0-K4): fields of the v2 answer (the request carried ?channels=N)
+        public int Channels { get; set; } = -1;              // top-level "channels"; -1: absent (old firmware / v1 answer)
+        public int CalibChannels { get; set; } = AtomSpectraRestSpectrum.Channels;   // "calib_channels": the scale of "calib"
+        public AtomSpectraRestEpoch Epoch { get; set; }      // boot_id / dev_resets / spec_resets; null: none of them
 
         public AtomSpectraRestDataReadyArgs(
             int[] histogram,
@@ -38,19 +42,49 @@ namespace BecquerelMonitor
 
     public static class AtomSpectraRestSpectrum
     {
-        public const int Channels = 8192;
+        public const int Channels = 8192;   // the board's full scale; the only length of an answer without "channels"
+
+        // F5 (plan K1): the N the board folds to; a profile with another number of channels sends no parameter
+        public static readonly int[] RequestableChannels = { 8192, 4096, 2048, 1024 };
+
+        public static int RequestChannels(int profileChannels)
+        {
+            return Array.IndexOf(RequestableChannels, profileChannels) >= 0 ? profileChannels : 0;
+        }
 
         // double.IsFinite does not exist in .NET Framework 4.8
         public static bool Finite(double v) { return !double.IsNaN(v) && !double.IsInfinity(v); }
 
+        private static long? Whole(Dictionary<string, object> o, string key)
+        {
+            double v = AtomSpectraJson.GetNumber(o, key, double.NaN);
+            return Finite(v) ? (long?)(long)v : null;
+        }
+
         public static AtomSpectraRestBoardSample ToSample(AtomSpectraRestDataReadyArgs d, long atMs)
         {
-            return new AtomSpectraRestBoardSample { HasData = true, Time = d.ElapsedTime, Total = d.Total, HistOk = d.HistOk, AtMs = atMs, Bins = d.Histogram };
+            return new AtomSpectraRestBoardSample { HasData = true, Time = d.ElapsedTime, Total = d.Total, HistOk = d.HistOk, AtMs = atMs, Bins = d.Histogram, Epoch = d.Epoch };
         }
 
         // /api/spectrum.json is the primary source: one snapshot carries counts, time, live time and rejected pulses together;
         // the binary /api/spectrum (32 KB) has no time, so the pair "spectrum - time" could not be built from it alone.
         public static AtomSpectraRestDataReadyArgs Parse(string json, out string error)
+        {
+            return Parse(json, 0, out error);
+        }
+
+        // F5 (plan K1): "channels", when present, must equal the bins; then the length must be the N asked for (8192 for a
+        // request without the parameter). Without "channels" only the old 8192 answer is taken (the client folds it).
+        public static string LengthError(int bins, int declared, int requested)
+        {
+            if (declared < 0) return bins == Channels ? null : "bins count " + bins + " without \"channels\" (only " + Channels + ")";
+            if (declared != bins) return "\"channels\" " + declared + " != bins count " + bins;
+            int wanted = requested > 0 ? requested : Channels;
+            return bins == wanted ? null : "\"channels\" " + bins + " != requested " + wanted;
+        }
+
+        // requested: the N of ?channels=N (0: the request had no parameter)
+        public static AtomSpectraRestDataReadyArgs Parse(string json, int requested, out string error)
         {
             error = null;
             try
@@ -71,15 +105,18 @@ namespace BecquerelMonitor
                     return null;
                 }
 
-                if (bins.Count != Channels)
+                int declared = o.ContainsKey("channels") ? (int)AtomSpectraJson.GetNumber(o, "channels", -1) : -1;
+                string lengthError = LengthError(bins.Count, declared, requested);
+                if (lengthError != null)
                 {
-                    error = "bins count != " + Channels;
+                    error = lengthError;
                     return null;
                 }
 
-                int[] histogram = new int[Channels];
+                int n = bins.Count;
+                int[] histogram = new int[n];
                 long sum = 0;
-                for (int i = 0; i < Channels; i++)
+                for (int i = 0; i < n; i++)
                 {
                     object item = bins[i];
                     if (!(item is double))
@@ -149,6 +186,9 @@ namespace BecquerelMonitor
                     for (int i = 0; i < calib.Length; i++) calib[i] = cal[i] is double ? (double)cal[i] : double.NaN;
                 }
 
+                AtomSpectraRestEpoch epoch = new AtomSpectraRestEpoch { BootId = Whole(o, "boot_id"), DevResets = Whole(o, "dev_resets"), SpecResets = Whole(o, "spec_resets") };
+                long? calibChannels = Whole(o, "calib_channels");
+
                 return new AtomSpectraRestDataReadyArgs(
                     histogram,
                     cpu,
@@ -159,7 +199,12 @@ namespace BecquerelMonitor
                     total,
                     silent,
                     histOk,
-                    calib);
+                    calib)
+                {
+                    Channels = declared,
+                    CalibChannels = calibChannels.HasValue && calibChannels.Value > 0 ? (int)calibChannels.Value : Channels,
+                    Epoch = epoch.Any ? epoch : null
+                };
             }
             catch (Exception ex)
             {
@@ -183,6 +228,9 @@ namespace BecquerelMonitor
 
         private readonly AtomSpectraRestClient _client;
         private readonly int _periodMs;
+        private readonly int _requestChannels;              // F5 (plan K1): N of ?channels=N, 0 = no parameter
+        private readonly AtomSpectraRestPeriod _period;     // F5 (B6): the effective period
+        private long _lastAnsweredMs;                       // F5: clock time of the last answer (0 = the start of the clock)
         private readonly ManualResetEvent _stopEvent = new ManualResetEvent(false);
         private Thread _thread;
         private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -208,24 +256,35 @@ namespace BecquerelMonitor
         public event EventHandler LinkRestored;
 
         public AtomSpectraRestAcquisition(AtomSpectraRestClient client, int periodSeconds)
+            : this(client, periodSeconds, 0)
+        {
+        }
+
+        public AtomSpectraRestAcquisition(AtomSpectraRestClient client, int periodSeconds, int requestChannels)
         {
             if (client == null) throw new ArgumentNullException("client");
             _client = client;
+            _requestChannels = AtomSpectraRestSpectrum.RequestChannels(requestChannels);
 
             int clamped = periodSeconds;
             if (clamped < 1) clamped = 1;
             if (clamped > 60) clamped = 60;
             _periodMs = clamped * 1000;
+            _period = new AtomSpectraRestPeriod(_periodMs);
         }
 
         public int DeadlineMs
         {
             get
             {
-                // plan 3: max(2 s, period / 2); at 1 s the poll may outlive the period, Run then skips ticks (no queue)
-                return Math.Max(MinDeadlineMs, _periodMs / 2);
+                // plan 3 / K5: max(2 s, period / 2) of the effective period (B6 lengthens both); at 1 s the poll may
+                // outlive the period, Run then skips ticks (no queue)
+                return Math.Max(MinDeadlineMs, _period.EffectiveMs / 2);
             }
         }
+
+        public int EffectivePeriodMs { get { return _period.EffectiveMs; } }
+        public string SpectrumPath { get { return "/api/spectrum.json" + (_requestChannels > 0 ? "?channels=" + _requestChannels : ""); } }
 
         public bool IsLinkLost
         {
@@ -313,7 +372,7 @@ namespace BecquerelMonitor
             {
                 Interlocked.Increment(ref _attempts);
 
-                AtomSpectraRestResponse r = _client.Get("/api/spectrum.json", DeadlineMs);
+                AtomSpectraRestResponse r = _client.Get(SpectrumPath, DeadlineMs);
                 _lastWireBytes = r.WireBytes;
                 _lastEncoding = r.ContentEncoding;
 
@@ -333,7 +392,7 @@ namespace BecquerelMonitor
 
                 if (error == null)
                 {
-                    data = AtomSpectraRestSpectrum.Parse(r.Body, out error);
+                    data = AtomSpectraRestSpectrum.Parse(r.Body, _requestChannels, out error);
                 }
 
                 if (error != null)
@@ -341,13 +400,18 @@ namespace BecquerelMonitor
                     Interlocked.Increment(ref _failures);
                     int cf = Interlocked.Increment(ref _consecutiveFailures);
                     _lastError = error;
+                    // F5 (B6): missed deadline, transport error or an answer that did not parse = a skipped poll: no Trip
+                    PeriodAfter(false);
 
                     AtomSpectraTcpLog.Warn("REST", "poll failed (" + cf + " in a row): " + error);
 
-                    if (cf == LinkLostAfterFailures && !_linkLost)
+                    // F5: also by the time without an answer, 3 CONFIGURED periods, so the B6 doubling does not delay the loss
+                    long silentMs = NowMs - Interlocked.Read(ref _lastAnsweredMs);
+                    bool silent = silentMs >= 3L * _periodMs;
+                    if ((cf == LinkLostAfterFailures || silent) && !_linkLost)
                     {
                         _linkLost = true;
-                        AtomSpectraTcpLog.Error("REST", "link lost after " + cf + " failed polls");
+                        AtomSpectraTcpLog.Error("REST", "link lost after " + cf + " failed polls, " + silentMs + " ms without an answer");
                         RaiseLinkLost();
                     }
 
@@ -357,6 +421,7 @@ namespace BecquerelMonitor
                 Interlocked.Increment(ref _successes);
                 _last = data;
                 MarkAnswered();
+                PeriodAfter(true);
                 AtomSpectraRestBoardSample sample = AtomSpectraRestSpectrum.ToSample(data, NowMs);
                 _lastSample = sample;
                 RaiseSampled(sample, data);
@@ -368,8 +433,21 @@ namespace BecquerelMonitor
             }
         }
 
+        // F5 (B6): full = a snapshot taken; a 404 "No spectrum data yet" is neither (the period stays, plan K6)
+        private void PeriodAfter(bool full)
+        {
+            int before = _period.EffectiveMs;
+            if (full ? _period.Full() : _period.Skip())
+            {
+                AtomSpectraTcpLog.Info("REST", "poll period " + (before / 1000.0).ToString(CultureInfo.InvariantCulture) + " s -> " +
+                    (_period.EffectiveMs / 1000.0).ToString(CultureInfo.InvariantCulture) + " s, deadline " + DeadlineMs + " ms" +
+                    (full ? " (" + AtomSpectraRestPeriod.FullToHalve + " full polls in a row)" : " (skipped poll: " + _lastError + ")"));
+            }
+        }
+
         private void MarkAnswered()
         {
+            Interlocked.Exchange(ref _lastAnsweredMs, NowMs);   // a snapshot or a 404: the board answers
             if (_linkLost)
             {
                 _linkLost = false;
@@ -392,10 +470,10 @@ namespace BecquerelMonitor
 
                 PollOnce();
 
-                next += _periodMs;
+                next += _period.EffectiveMs;
 
                 long nowMs = _clock.ElapsedMilliseconds;
-                if (next <= nowMs) next = nowMs + _periodMs;
+                if (next <= nowMs) next = nowMs + _period.EffectiveMs;
 
                 if (nowMs >= nextStats)
                 {

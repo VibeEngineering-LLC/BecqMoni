@@ -12,7 +12,8 @@ namespace BecquerelMonitor
         public long Total;
         public long HistOk;
         public long AtMs;
-        public int[] Bins;          // the 8192 channels of the snapshot (null for a sample without data)
+        public int[] Bins;          // the channels of the snapshot (null for a sample without data)
+        public AtomSpectraRestEpoch Epoch;   // F5 (plan K2): null when the answer carries no epoch field
 
         public static AtomSpectraRestBoardSample NoData(long atMs)
         {
@@ -25,6 +26,27 @@ namespace BecquerelMonitor
                 AtMs = atMs
             };
         }
+    }
+
+    // F5 (plan K2): the board's epoch, three optional top-level fields of the v2 answer. A change of any of them (growth by
+    // any amount or a drop = one event) is a new acquisition on the board: a new session, never a Trip.
+    public sealed class AtomSpectraRestEpoch
+    {
+        public long? BootId, DevResets, SpecResets;   // null: the field is absent
+
+        public bool Any { get { return BootId.HasValue || DevResets.HasValue || SpecResets.HasValue; } }
+
+        // What changed since `before` (null: the same epoch); a field absent on either side is not compared
+        public string ChangeFrom(AtomSpectraRestEpoch before)
+        {
+            if (before == null) return null;
+            if (Differs(BootId, before.BootId)) return "boot_id " + before.BootId + " -> " + BootId;
+            if (Differs(DevResets, before.DevResets)) return "dev_resets " + before.DevResets + " -> " + DevResets;
+            if (Differs(SpecResets, before.SpecResets)) return "spec_resets " + before.SpecResets + " -> " + SpecResets;
+            return null;
+        }
+
+        private static bool Differs(long? now, long? before) { return now.HasValue && before.HasValue && now.Value != before.Value; }
     }
 
     public enum AtomSpectraRestStartChoice
@@ -164,6 +186,30 @@ namespace BecquerelMonitor
         }
     }
 
+    // F5 (plan R5, B6): the effective poll period. A skipped poll doubles it (ceiling 30 s, or the configured period if longer);
+    // 5 full polls in a row halve it, not below the configured period and not below 2 s. Skip/Full: true = the period changed.
+    public sealed class AtomSpectraRestPeriod
+    {
+        public const int CeilingMs = 30000, FloorMs = 2000, FullToHalve = 5;
+        private readonly int configuredMs;
+        private int fullInRow;
+        public int EffectiveMs { get; private set; }
+        public AtomSpectraRestPeriod(int configuredMs) { this.configuredMs = configuredMs; EffectiveMs = configuredMs; }
+        public bool Skip()
+        {
+            fullInRow = 0;
+            return Set(Math.Min(Math.Max(CeilingMs, configuredMs), EffectiveMs * 2));
+        }
+        public bool Full()
+        {
+            if (++fullInRow < FullToHalve) return false;
+            fullInRow = 0;
+            int next = Math.Max(Math.Max(configuredMs, FloorMs), EffectiveMs / 2);
+            return Set(Math.Min(EffectiveMs, next));
+        }
+        private bool Set(int ms) { if (ms == EffectiveMs) return false; EffectiveMs = ms; return true; }
+    }
+
     public sealed class AtomSpectraRestGuard
     {
         private readonly object sync = new object();
@@ -177,7 +223,10 @@ namespace BecquerelMonitor
         private int[] lastBins;        // pass A N1: channels of the last accepted snapshot
         private bool afterReset;       // pass A N5: our reset was accepted, the board may still serve the old snapshot
         private long staleTime, staleTotal;
+        private AtomSpectraRestEpoch lastEpoch;   // F5 (plan K2): the epoch of the first answer after Start, then of the last one
 
+        public int EpochChanges { get; private set; }
+        public string LastEpochChange { get; private set; }
         public bool Tripped { get; private set; }
         public string TripReason { get; private set; }
 
@@ -192,6 +241,7 @@ namespace BecquerelMonitor
                 histFromSample = false;
                 lastBins = null;
                 afterReset = false;
+                lastEpoch = null;
                 Tripped = false;
                 TripReason = null;
                 sawGrowth = counting;
@@ -234,9 +284,20 @@ namespace BecquerelMonitor
                 }
                 afterReset = false;
 
+                // F5 (plan K2): a changed epoch = a new acquisition on the board; the path of our own reset, no Trip
+                string change = s != null && s.HasData && s.Epoch != null ? s.Epoch.ChangeFrom(lastEpoch) : null;
+                if (change != null)
+                {
+                    AcceptReset(0, 0);
+                    EpochChanges++;
+                    LastEpochChange = change;
+                }
+
                 if (s == null || !s.HasData)
                 {
-                    if (hasLast && (lastTime > 0 || lastTotal > 0))
+                    // F5 (plan K6): a board that reports its epoch answers 404 after a reset until the first sweep;
+                    // the epoch of the next snapshot tells a new acquisition apart, so the 404 itself is no Trip
+                    if (hasLast && (lastTime > 0 || lastTotal > 0) && lastEpoch == null)
                     {
                         return Trip("the board has no spectrum any more (404 after time " + lastTime + " s, total " + lastTotal + ")");
                     }
@@ -273,6 +334,7 @@ namespace BecquerelMonitor
                 lastTotal = s.Total;
                 lastHistOk = s.HistOk;
                 lastBins = s.Bins;
+                if (s.Epoch != null) lastEpoch = s.Epoch;
                 histFromSample = true;
                 return AtomSpectraRestUpdate.Apply;
             }

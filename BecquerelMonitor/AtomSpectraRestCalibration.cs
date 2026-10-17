@@ -6,6 +6,43 @@ namespace BecquerelMonitor
 {
     public static class AtomSpectraRestCalibration
     {
+        // F5 (plan K4): channel k' of the folded spectrum sums fine channels m*k' .. m*k'+m-1 (the board and Compress alike);
+        // it is placed at the centre of its group, x = m*k' + GroupCentre(m).
+        // Assumption: the argument of the board's polynomial is the index of the channel centre (accepted by Codeaudit
+        // for K4, not confirmed by the board).
+        public static double GroupCentre(int m)
+        {
+            return (m - 1) / 2.0;
+        }
+
+        private static double Binomial(int n, int k)
+        {
+            double r = 1;
+            for (int t = 1; t <= k; t++) r = r * (n - k + t) / t;
+            return r;
+        }
+
+        // F5 (plan K4): "calib" is for calib_channels (8192 when the field is absent); for `channels` = calib_channels / m the
+        // polynomial E(x), x = m*k' + s, is expanded in powers of k' (same degree): b_j = m^j * sum_i a_i C(i,j) s^(i-j).
+        // m = 1: the slots unchanged. NaN (an empty slot) stays NaN. No whole m: null (the calibration is not taken).
+        public static double[] ForChannels(double[] slots, int calibChannels, int channels)
+        {
+            if (slots == null) return null;
+            if (calibChannels <= 0) calibChannels = AtomSpectraRestSpectrum.Channels;
+            if (channels <= 0 || channels == calibChannels) return (double[])slots.Clone();
+            if (channels > calibChannels || calibChannels % channels != 0) return null;
+            int m = calibChannels / channels;
+            double s = GroupCentre(m);
+            double[] b = new double[slots.Length];
+            for (int j = 0; j < slots.Length; j++)
+            {
+                double sum = 0;
+                for (int i = j; i < slots.Length; i++) if (!double.IsNaN(slots[i])) sum += slots[i] * Binomial(i, j) * Math.Pow(s, i - j);
+                b[j] = double.IsNaN(slots[j]) ? double.NaN : sum * Math.Pow(m, j);
+            }
+            return b;
+        }
+
         public static AtomSpectraTcpCalibrationResult Read(AtomSpectraRestClient client, int deadlineMs)
         {
             AtomSpectraRestResponse r = client.Get("/api/device", deadlineMs);

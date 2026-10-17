@@ -80,6 +80,8 @@ namespace BecquerelMonitor
                     rest.DocumentCounts = r.EnergySpectrum != null ? r.EnergySpectrum.ValidPulseCount : 0;
                     // operator 9.1: asked on the UI thread; a headless run never asks (joins or refuses)
                     rest.Ask = AppUi.HasWindows ? new Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice>(AtomSpectraRestUi.AskStart) : null;
+                    // F5 (plan K1): ?channels=N of the profile at Start (the same number restChannels keeps below)
+                    rest.RequestChannels = r.DeviceConfig != null ? r.DeviceConfig.NumberOfChannels : 0;
                     bool newDoc = newDocumentCreated;
                     AtomSpectraTcpBeginOutcome outcome = AtomSpectraRestUi.RunWithWait(delegate { return rest.Begin(newDoc, CommandTimeoutMs); });
                     if (outcome == AtomSpectraTcpBeginOutcome.Started)

@@ -65,6 +65,8 @@ namespace BecquerelMonitor
         public Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice> Ask;
         public long DocumentSeconds;
         public long DocumentCounts;
+        public int RequestChannels;   // F5 (plan K1): channels of the profile at Start; ?channels=N only for 8192/4096/2048/1024
+        private int epochChangesSeen;
 
         // The message of a lost link for the user: REST keeps polling every period (plan M5), not the TCP bridge's 60 s reconnect.
         public string LinkLostText()
@@ -287,7 +289,8 @@ namespace BecquerelMonitor
                     return AtomSpectraTcpBeginOutcome.Cancelled;
             }
 
-            acquisition = new AtomSpectraRestAcquisition(client, periodSeconds);
+            epochChangesSeen = guard.EpochChanges;
+            acquisition = new AtomSpectraRestAcquisition(client, periodSeconds, RequestChannels);
             acquisition.Sampled += OnSampled;
             acquisition.LinkLost += OnLinkLost;
             acquisition.LinkRestored += OnLinkRestored;
@@ -558,6 +561,11 @@ namespace BecquerelMonitor
         private void OnSampled(object sender, AtomSpectraRestSampleArgs e)
         {
             AtomSpectraRestUpdate u = guard.Check(e.Sample);
+            if (guard.EpochChanges != epochChangesSeen)
+            {
+                epochChangesSeen = guard.EpochChanges;   // F5 (plan K2): logged once per change
+                AtomSpectraTcpLog.Info("Session", "new acquisition on the board (" + guard.LastEpochChange + "): a new session, no Trip; the document follows the board");
+            }
             if (u == AtomSpectraRestUpdate.Apply)
             {
                 if (e.Data != null)

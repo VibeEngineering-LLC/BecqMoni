@@ -345,6 +345,8 @@ namespace BecquerelMonitor
                 ? new AtomSpectraRestDataReadyArgs(hist, e.CpuLoad, e.ElapsedTime, e.InvalidPulses, e.Cps, rest.LiveSeconds, rest.Total,
                     rest.SpectrometerSilent, rest.HistOk, rest.Calibration)
                 : new AtomSpectraTcpDataReadyArgs(hist, e.CpuLoad, e.ElapsedTime, e.InvalidPulses, e.Cps);
+            AtomSpectraRestDataReadyArgs restArgs = args as AtomSpectraRestDataReadyArgs;
+            if (restArgs != null) restArgs.CalibChannels = rest.CalibChannels;   // F5 (plan K4): the scale of "calib"
             IAtomSpectraSession s = session;
             if (s != null)
             {
@@ -376,7 +378,9 @@ namespace BecquerelMonitor
             {
                 // 2026-10-16 (operator): the board calibration of the first snapshot after Start -> the document and the configuration
                 boardCalibrationPending = false;
-                AtomSpectraTcpLog.Info("Cal", ApplyBoardCalibration(spectrum, resultData.DeviceConfig, restSnapshot.Calibration,
+                // F5 (plan K4): "calib" is for calib_channels; the document has e.Histogram.Length channels (board or client fold)
+                double[] slots = AtomSpectraRestCalibration.ForChannels(restSnapshot.Calibration, restSnapshot.CalibChannels, e.Histogram.Length);
+                AtomSpectraTcpLog.Info("Cal", ApplyBoardCalibration(spectrum, resultData.DeviceConfig, slots,
                     c => DeviceConfigManager.GetInstance().SaveConfig(c)));
             }
 
