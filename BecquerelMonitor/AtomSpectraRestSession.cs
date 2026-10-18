@@ -270,9 +270,12 @@ namespace BecquerelMonitor
                         Failure = AtomSpectraRestFailure.StopRefused;
                         return AtomSpectraTcpBeginOutcome.NoAnswer;
                     }
+                    guard.Begin(0, 0, true);
+                    guard.ExpectOwnReset();   // the window of OUR reset opens before the request goes (no acquisition yet: t0 = the first snapshot)
                     AtomSpectraRestResponse rr = client.Reset(commandTimeoutMs);
                     if (!rr.Accepted || rr.SentFalse)
                     {
+                        if (rr.NotSent || rr.SentFalse) guard.CancelOwnReset();
                         lastError = rr.SentFalse ? "reset answered sent=false: the analyzer did not get -rst" : rr.Error ?? ("reset answered " + rr.Status + " " + rr.Body);
                         Failure = AtomSpectraRestFailure.ResetRefused;
                         AtomSpectraTcpLog.Error("Session", "Start over: reset refused (" + lastError + ")" + (counting ? "; the board was already stopped by -sto" : ""));
@@ -280,7 +283,7 @@ namespace BecquerelMonitor
                     }
                     AtomSpectraTcpLog.Info("Session", "Start over: board reset");
                     RestartedBoard = true;
-                    guard.AcceptReset(boardTime, second.HasData ? second.Total : 0);
+                    guard.ConfirmOwnReset(boardTime, second.HasData ? second.Total : 0);
                     if (!Send(AtomSpectraRestPolicy.StartCommand(limitSeconds), commandTimeoutMs))
                     {
                         Failure = AtomSpectraRestFailure.StartRefused;
@@ -574,7 +577,11 @@ namespace BecquerelMonitor
         private void NoDataSignal(AtomSpectraRestUpdate u, AtomSpectraRestBoardSample sample, AtomSpectraRestAcquisition running)
         {
             if (sample == null) return;
-            if (sample.HasData) { noDataSince = -1; noDataReported = false; return; }
+            if (sample.HasData)
+            {
+                if (u == AtomSpectraRestUpdate.Apply) { noDataSince = -1; noDataReported = false; }   // D5: a snapshot that is not taken (Stale) is not data
+                return;
+            }
             if (u != AtomSpectraRestUpdate.NoData) return;
             if (noDataSince < 0) noDataSince = sample.AtMs;
             long period = running != null ? running.EffectivePeriodMs : 1000;

@@ -510,6 +510,13 @@ namespace BecquerelMonitor
             return Send("GET", path, null, false, deadlineMs);
         }
 
+        // F3: a repeated attempt of a poll goes over a connection of its own (own group, no keep-alive), so it never waits behind the
+        // aborted one on a pooled connection; the board serves one request at a time.
+        public AtomSpectraRestResponse Get(string path, int deadlineMs, string connectionGroup)
+        {
+            return Send("GET", path, null, false, deadlineMs, connectionGroup);
+        }
+
         public AtomSpectraRestResponse Post(string path, string body, int deadlineMs)
         {
             if (_csrfToken == null)
@@ -570,7 +577,7 @@ namespace BecquerelMonitor
             return false;
         }
 
-        private AtomSpectraRestResponse Send(string method, string path, string body, bool withToken, int deadlineMs)
+        private AtomSpectraRestResponse Send(string method, string path, string body, bool withToken, int deadlineMs, string connectionGroup = null)
         {
             Stopwatch sw = Stopwatch.StartNew();
             AtomSpectraRestResponse result = new AtomSpectraRestResponse();
@@ -591,6 +598,11 @@ namespace BecquerelMonitor
                 // A POST gets its own connection: a pooled one the board has silently dropped would turn
                 // "not sent" into "sent, no answer" (pass C 3); polls keep the connection.
                 req.KeepAlive = method != "POST";
+                if (connectionGroup != null)
+                {
+                    req.ConnectionGroupName = connectionGroup;
+                    req.KeepAlive = false;
+                }
                 if (method == "POST")
                 {
                     // KeepAlive=false alone still lets a POST ride an idle pooled poll connection; its own group

@@ -222,7 +222,8 @@ namespace BecquerelMonitor
 
     public sealed class AtomSpectraRestAcquisition : IDisposable
     {
-        public const int LinkLostAfterFailures = 3;
+        public const int LinkLostAfterFailures = 3;   // no longer used for the decision (silence only); kept as it was part of the class
+        public static int LinkLostFloorMs = 15000;    // the least silence that is a lost link (a test lowers it to keep a short outage scenario)
         public const int MinDeadlineMs = 2000;
         public const int StatsEveryMs = 5000;
 
@@ -372,7 +373,10 @@ namespace BecquerelMonitor
             {
                 Interlocked.Increment(ref _attempts);
 
-                AtomSpectraRestResponse r = _client.Get(SpectrumPath, DeadlineMs);
+                AtomSpectraRestResponse r;
+                string error;
+                AtomSpectraRestDataReadyArgs data;
+                FetchWithRetry(out r, out data, out error);   // F3: a failed attempt is repeated inside the period (see there)
                 _lastWireBytes = r.WireBytes;
                 _lastEncoding = r.ContentEncoding;
 
@@ -387,14 +391,6 @@ namespace BecquerelMonitor
                     return true;
                 }
 
-                string error = r.Ok ? null : (r.Error ?? "HTTP " + r.Status);
-                AtomSpectraRestDataReadyArgs data = null;
-
-                if (error == null)
-                {
-                    data = AtomSpectraRestSpectrum.Parse(r.Body, _requestChannels, out error);
-                }
-
                 if (error != null)
                 {
                     Interlocked.Increment(ref _failures);
@@ -406,11 +402,11 @@ namespace BecquerelMonitor
 
                     AtomSpectraTcpLog.Warn("REST", "poll failed (" + cf + " in a row): " + error);
 
-                    // F5: also by the time without an answer: 3 periods, the larger of the configured one and the one in force
-                    // (finding 2: with the period doubled by skipped polls, 3 configured periods are only 1-2 polls)
+                    // The link is lost only by SILENCE (letter of Codeaudit 18.10): no answer for max(3 periods, 15 s); the period is the larger of
+                    // the configured one and the one in force. The count of failures in a row is not used: they come fast when a board refuses.
                     long silentMs = NowMs - Interlocked.Read(ref _lastAnsweredMs);
-                    bool silent = silentMs >= 3L * Math.Max(_periodMs, periodInForce);
-                    if ((cf == LinkLostAfterFailures || silent) && !_linkLost)
+                    bool silent = silentMs >= Math.Max(3L * Math.Max(_periodMs, periodInForce), (long)LinkLostFloorMs);
+                    if (silent && !_linkLost)
                     {
                         _linkLost = true;
                         AtomSpectraTcpLog.Error("REST", "link lost after " + cf + " failed polls, " + silentMs + " ms without an answer");
@@ -432,6 +428,53 @@ namespace BecquerelMonitor
             finally
             {
                 Interlocked.Decrement(ref _inFlight);
+            }
+        }
+
+        // F3 (letter "pravilo-okna" item 2): a failed attempt is repeated INSIDE the period (see FetchWithRetry)
+        public const int RetryPauseMs = 200;
+        // the attempt of one poll is max(MinDeadlineMs, 0.3 x period) = period * AttemptPermille / 1000 (Codeaudit 2026-10-18); the ONLY place of the 0.3
+        public const int AttemptPermille = 300;
+        public static int MaxAttempts = 3;   // attempts per period at most (a test sets 1 to feed one case per poll)
+        private int _retries;
+        public int Retries { get { return Volatile.Read(ref _retries); } }
+
+        // error == null: a snapshot (data) or a 404 (data == null, the caller tells them apart by the status)
+        private void Judge(AtomSpectraRestResponse r, out AtomSpectraRestDataReadyArgs data, out string error)
+        {
+            data = null;
+            error = null;
+            if (r.Status == 404) return;
+            error = r.Ok ? null : (r.Error ?? "HTTP " + r.Status);
+            if (error == null) data = AtomSpectraRestSpectrum.Parse(r.Body, _requestChannels, out error);
+        }
+
+        // Repeated: no answer (timeout, cancel, reset) and a cut-off body (the JSON does not parse). Not repeated: data, a 404 (an answer),
+        // any other HTTP status, a whole answer whose data is wrong.
+        private static bool Repeatable(AtomSpectraRestResponse r, string error)
+        {
+            if (r.Status == 404) return false;
+            if (error == null) return false;
+            if (r.Status == 0) return !r.NotSent;   // a refused connect (NotSent) is not repeated: nothing listens, a pause of 0.2 s changes nothing
+            return r.Ok && error.StartsWith("parse exception");
+        }
+
+        // An attempt lasts max(2 s, 0.3 x period); there are min(3, period / attempt) of them, at least one; the next one only if the time
+        // spent + the pause + an attempt still fits the period. Each repeated attempt has a connection of its own.
+        private void FetchWithRetry(out AtomSpectraRestResponse r, out AtomSpectraRestDataReadyArgs data, out string error)
+        {
+            int period = _period.EffectiveMs;
+            int attemptMs = Math.Max(MinDeadlineMs, (int)((long)period * AttemptPermille / 1000));
+            int attempts = Math.Max(1, Math.Min(MaxAttempts, period / attemptMs));
+            Stopwatch spent = Stopwatch.StartNew();
+            for (int n = 1; ; n++)
+            {
+                r = n == 1 ? _client.Get(SpectrumPath, attempts > 1 ? attemptMs : DeadlineMs) : _client.Get(SpectrumPath, attemptMs, "retry-" + Guid.NewGuid().ToString("N"));
+                Judge(r, out data, out error);
+                if (!Repeatable(r, error) || n >= attempts || spent.ElapsedMilliseconds + RetryPauseMs + attemptMs > period) return;
+                Interlocked.Increment(ref _retries);
+                AtomSpectraTcpLog.Info("REST", "poll attempt " + n + " of " + attempts + " failed (" + error + "), repeated inside the period");
+                if (_stopEvent.WaitOne(RetryPauseMs)) return;
             }
         }
 

@@ -232,6 +232,7 @@ namespace BecquerelMonitor
         private AtomSpectraRestEpoch epochBeforeOwnReset;   // the epoch the board had when WE reset it (Begin forgets lastEpoch)
         private long windowT0 = -1, windowShiftAt = -1;      // AtMs of the opening (-1: the first snapshot sets it) and of the last change
         private int windowChanges, changesSinceExpect;
+        private long pendingT0 = -1;              // t0 of a repeated Clear, taken over when its request is confirmed
         private bool openedByExpect, windowPrior;   // an ExpectOwnReset is pending (not yet confirmed / cancelled); a window was open before it
         public int PeriodMs = 1000;               // the period in force, set by the session before every Check
         public Action<string> Note;               // log lines of the guard (the session writes them to the log)
@@ -287,22 +288,36 @@ namespace BecquerelMonitor
             {
                 windowPrior = ownReset;
                 openedByExpect = true;
-                if (!ownReset) epochBeforeOwnReset = lastEpoch;
+                changesSinceExpect = 0;
+                pendingT0 = nowMs;
+                if (windowPrior) return;   // a repeated Clear leaves the open window as it is until its request is confirmed
+                epochBeforeOwnReset = lastEpoch;
                 ownReset = true;
                 windowT0 = nowMs;
                 windowShiftAt = -1;
                 windowChanges = 0;
-                changesSinceExpect = 0;
             }
         }
 
         // The request was accepted: the usual acceptance, unless the new acquisition has already been taken inside the window.
         public void ConfirmOwnReset()
         {
-            bool done;
-            lock (sync) { done = changesSinceExpect > 0; }
-            if (!done) AcceptReset();
-            lock (sync) { openedByExpect = false; }
+            long t, n;
+            lock (sync) { t = lastTime; n = lastTotal; }
+            ConfirmOwnReset(t, n);
+        }
+
+        // preTime/preTotal: the board before our reset (Start over knows them from the probes)
+        public void ConfirmOwnReset(long preTime, long preTotal)
+        {
+            bool done, prior;
+            lock (sync) { done = changesSinceExpect > 0; prior = windowPrior; }
+            if (!done) AcceptReset(preTime, preTotal);
+            lock (sync)
+            {
+                if (prior && !done) { windowT0 = pendingT0; windowShiftAt = -1; windowChanges = 0; }   // a repeated Clear that went out: a new answer is due
+                openedByExpect = false;
+            }
         }
 
         // The request certainly never reached the board (NotSent) or the board said the reset was not done (sent=false):
@@ -311,7 +326,8 @@ namespace BecquerelMonitor
         {
             lock (sync)
             {
-                if (!openedByExpect || windowPrior || changesSinceExpect > 0) return;
+                if (!openedByExpect) return;
+                if (windowPrior || changesSinceExpect > 0) { openedByExpect = false; return; }   // the older window was never touched: it is back as it was
                 ownReset = false;
                 epochBeforeOwnReset = null;
                 windowT0 = -1;
@@ -415,6 +431,9 @@ namespace BecquerelMonitor
                     return AtomSpectraRestUpdate.NoData;
                 }
 
+                // our reset was asked for but its outcome is not known (no confirmation): a drop of the counters is its answer
+                bool counted = s.Time < lastTime || s.Total < lastTotal || (histFromSample && s.HistOk < lastHistOk) || FirstDecrease(lastBins, s.Bins) >= 0;
+                if (hasLast && ownReset && openedByExpect && counted) AbsorbChange("counters went down: time " + lastTime + " -> " + s.Time + " s, total " + lastTotal + " -> " + s.Total, s.AtMs);
                 if (hasLast && (s.Time < lastTime || s.Total < lastTotal || (histFromSample && s.HistOk < lastHistOk)))
                 {
                     return Trip("board counters went down: time " + lastTime + " -> " + s.Time + " s, total " + lastTotal + " -> " + s.Total + ", hist_ok " + lastHistOk + " -> " + s.HistOk);
@@ -445,6 +464,8 @@ namespace BecquerelMonitor
                 lastTotal = s.Total;
                 lastHistOk = s.HistOk;
                 lastBins = s.Bins;
+                // the first snapshot with an epoch after our reset (no reference before it) is the answer to it: the window ends 6 s after it
+                if (ownReset && s.Epoch != null && refEpoch == null) { windowShiftAt = s.AtMs; if (windowChanges < 1) windowChanges = 1; }
                 if (s.Epoch != null) lastEpoch = s.Epoch;
                 histFromSample = true;
                 return AtomSpectraRestUpdate.Apply;
