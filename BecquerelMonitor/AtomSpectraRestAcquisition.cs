@@ -441,6 +441,7 @@ namespace BecquerelMonitor
             int before = _period.EffectiveMs;
             if (full ? _period.Full() : _period.Skip())
             {
+                AtomSpectraTcpLog.StaleAfterSeconds = 2 * _period.EffectiveMs / 1000 + 5;   // the freshness mark of the log window follows the period in force
                 AtomSpectraTcpLog.Info("REST", "poll period " + (before / 1000.0).ToString(CultureInfo.InvariantCulture) + " s -> " +
                     (_period.EffectiveMs / 1000.0).ToString(CultureInfo.InvariantCulture) + " s, deadline " + DeadlineMs + " ms" +
                     (full ? " (" + AtomSpectraRestPeriod.FullToHalve + " full polls in a row)" : " (skipped poll: " + _lastError + ")"));

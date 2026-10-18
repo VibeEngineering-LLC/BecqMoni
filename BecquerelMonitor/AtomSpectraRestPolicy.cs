@@ -187,7 +187,8 @@ namespace BecquerelMonitor
     }
 
     // F5 (plan R5, B6): the effective poll period. A skipped poll doubles it (ceiling 30 s, or the configured period if longer);
-    // 5 full polls in a row halve it, down to 2 s (the configured period is where it starts, not a floor). Skip/Full: true = the period changed.
+    // 5 full polls in a row halve it, not below the configured period and not below 2 s (the operator 18.10: not more often than configured).
+    // Skip/Full: true = the period changed.
     public sealed class AtomSpectraRestPeriod
     {
         public const int CeilingMs = 30000, FloorMs = 2000, FullToHalve = 5;
@@ -204,7 +205,7 @@ namespace BecquerelMonitor
         {
             if (++fullInRow < FullToHalve) return false;
             fullInRow = 0;
-            int next = Math.Max(FloorMs, EffectiveMs / 2);   // finding 5 (Codeaudit pass): down to the 2 s floor, the configured period is the start value only
+            int next = Math.Max(Math.Max(configuredMs, FloorMs), EffectiveMs / 2);   // decision of the operator 18.10: not more often than configured
             return Set(Math.Min(EffectiveMs, next));
         }
         private bool Set(int ms) { if (ms == EffectiveMs) return false; EffectiveMs = ms; return true; }
@@ -224,9 +225,16 @@ namespace BecquerelMonitor
         private bool afterReset;       // pass A N5: our reset was accepted, the board may still serve the old snapshot
         private long staleTime, staleTotal;
         private AtomSpectraRestEpoch lastEpoch;   // F5 (plan K2): the epoch of the first answer after Start, then of the last one
-        private bool ownReset;                    // our own reset (Clear / Start over) is accepted: the first epoch change after it is its answer
+        // The window of our own reset (letter "pravilo-okna"): opened BEFORE the reset request goes, judged by the TIME of the snapshots.
+        // Any change of the epoch triple inside it belongs to our reset; the first snapshot does not close it. It closes
+        // max(6 s, 2 x period) after the last change, or max(30 s, 2 x period + 10 s) after the opening when nothing changed.
+        private bool ownReset;                    // the window is open
         private AtomSpectraRestEpoch epochBeforeOwnReset;   // the epoch the board had when WE reset it (Begin forgets lastEpoch)
-        private bool armed, absorbed;             // P1-1: ownReset is raised BEFORE the reset request goes; absorbed = its answer already came
+        private long windowT0 = -1, windowShiftAt = -1;      // AtMs of the opening (-1: the first snapshot sets it) and of the last change
+        private int windowChanges, changesSinceExpect;
+        private bool openedByExpect, windowPrior;   // an ExpectOwnReset is pending (not yet confirmed / cancelled); a window was open before it
+        public int PeriodMs = 1000;               // the period in force, set by the session before every Check
+        public Action<string> Note;               // log lines of the guard (the session writes them to the log)
 
         public int EpochChanges { get; private set; }
         public string LastEpochChange { get; private set; }
@@ -247,8 +255,11 @@ namespace BecquerelMonitor
                 lastEpoch = null;
                 ownReset = false;
                 epochBeforeOwnReset = null;
-                armed = false;
-                absorbed = false;
+                windowT0 = -1;
+                windowShiftAt = -1;
+                windowChanges = 0;
+                changesSinceExpect = 0;
+                openedByExpect = false;
                 Tripped = false;
                 TripReason = null;
                 sawGrowth = counting;
@@ -266,15 +277,22 @@ namespace BecquerelMonitor
 
         // P1-1: raised BEFORE the reset request is sent. Polling goes on while the request is in flight, and a snapshot with a new
         // epoch in that window is the answer to our reset, not a board reset from outside.
-        public void ExpectOwnReset()
+        public void ExpectOwnReset() { ExpectOwnReset(-1); }
+
+        // nowMs: the clock of the snapshots (AtMs) at the moment of opening; -1 = the first snapshot sets it.
+        // A repeated Clear before the first snapshot opens the window anew (from the new t0) and keeps its reference epoch.
+        public void ExpectOwnReset(long nowMs)
         {
             lock (sync)
             {
-                if (ownReset) return;
+                windowPrior = ownReset;
+                openedByExpect = true;
+                if (!ownReset) epochBeforeOwnReset = lastEpoch;
                 ownReset = true;
-                armed = true;
-                absorbed = false;
-                epochBeforeOwnReset = lastEpoch;
+                windowT0 = nowMs;
+                windowShiftAt = -1;
+                windowChanges = 0;
+                changesSinceExpect = 0;
             }
         }
 
@@ -282,19 +300,23 @@ namespace BecquerelMonitor
         public void ConfirmOwnReset()
         {
             bool done;
-            lock (sync) { done = armed && absorbed; armed = false; absorbed = false; }
+            lock (sync) { done = changesSinceExpect > 0; }
             if (!done) AcceptReset();
+            lock (sync) { openedByExpect = false; }
         }
 
-        // The request failed (sent=false, not accepted, exception): no reset happened, the allowance is withdrawn.
+        // The request certainly never reached the board (NotSent) or the board said the reset was not done (sent=false):
+        // the window is withdrawn at once. An unknown outcome (lost answer, exception) does NOT call this: the window lives to its term.
         public void CancelOwnReset()
         {
             lock (sync)
             {
-                if (!armed) return;
-                if (!absorbed) { ownReset = false; epochBeforeOwnReset = null; }
-                armed = false;
-                absorbed = false;
+                if (!openedByExpect || windowPrior || changesSinceExpect > 0) return;
+                ownReset = false;
+                epochBeforeOwnReset = null;
+                windowT0 = -1;
+                windowShiftAt = -1;
+                openedByExpect = false;
             }
         }
 
@@ -302,16 +324,54 @@ namespace BecquerelMonitor
         public void AcceptReset(long preTime, long preTotal)
         {
             AtomSpectraRestEpoch before;
-            lock (sync) { before = lastEpoch ?? (ownReset ? epochBeforeOwnReset : null); }
+            long t0, shift;
+            bool wasOpen, byExpect;
+            int changes, since;
+            lock (sync)
+            {
+                wasOpen = ownReset; byExpect = openedByExpect; changes = windowChanges; since = changesSinceExpect;
+                wasOpen = ownReset;
+                t0 = wasOpen && byExpect ? windowT0 : -1; shift = wasOpen && byExpect ? windowShiftAt : -1;   // a bare reset (Start over) starts a window of its own
+                before = lastEpoch ?? (wasOpen ? epochBeforeOwnReset : null);
+                // a repeated reset before the first snapshot of the new set: the numbers of the board BEFORE the first reset stay
+                if (wasOpen && !hasLast) { preTime = Math.Max(preTime, staleTime); preTotal = Math.Max(preTotal, staleTotal); }
+            }
             Begin(0, 0, true);
             lock (sync)
             {
                 staleTime = preTime;
                 staleTotal = preTotal;
                 afterReset = preTime > 0 || preTotal > 0;
-                ownReset = true;               // finding 1/4: the epoch of the board changes because of THIS reset, that is no board reset
+                ownReset = true;               // the epoch of the board changes because of THIS reset, that is no board reset
                 epochBeforeOwnReset = before;
+                windowT0 = t0; windowShiftAt = shift; windowChanges = wasOpen && byExpect ? changes : 0; changesSinceExpect = wasOpen && byExpect ? since : 0;
+                openedByExpect = wasOpen && byExpect;
             }
+        }
+
+        // The window ends max(6 s, 2 x period) after the last change; without a change max(30 s, 2 x period + 10 s) after the opening.
+        private void ExpireWindow(long at)
+        {
+            if (!ownReset) return;
+            if (windowT0 < 0) windowT0 = at;
+            long term = windowShiftAt >= 0 ? windowShiftAt + Math.Max(6000L, 2L * PeriodMs) : windowT0 + Math.Max(30000L, 2L * PeriodMs + 10000L);
+            if (at <= term) return;
+            ownReset = false;
+            epochBeforeOwnReset = null;
+            windowT0 = windowShiftAt = -1;
+            openedByExpect = false;
+        }
+
+        // A change of the triple inside the window: a new acquisition of our own reset. The first one is its answer; each further one
+        // (a real reset from outside, or a second step of ours) is swallowed and written to the log once.
+        private void AbsorbChange(string change, long at)
+        {
+            afterReset = false;
+            windowChanges++;
+            changesSinceExpect++;
+            windowShiftAt = at;
+            hasLast = false; lastBins = null; histFromSample = false; lastHistOk = 0;
+            if (windowChanges >= 2 && Note != null) Note("external reset swallowed by own-reset window: " + change);
         }
 
         public AtomSpectraRestUpdate Check(AtomSpectraRestBoardSample s)
@@ -323,28 +383,22 @@ namespace BecquerelMonitor
                     return AtomSpectraRestUpdate.Decreased;
                 }
 
-                // F5 (plan K2, decision of the operator 17.10): a changed epoch is a reset of the board. If WE reset it
-                // (ownReset) it is the answer to our own reset: a new acquisition, taken (finding 4: checked BEFORE Stale, a new
-                // set that has caught up with the old numbers is not the cached snapshot). Otherwise polling stops and the
-                // document is never overwritten (finding 1: the same path as a drop of the counters).
-                string change = s != null && s.HasData && s.Epoch != null ? s.Epoch.ChangeFrom(lastEpoch ?? (ownReset ? epochBeforeOwnReset : null)) : null;
+                // F5 (plan K2, decision of the operator 17.10): a changed epoch is a reset of the board, polling stops and the document
+                // is never overwritten (the same path as a drop of the counters), unless the window of OUR reset is open: then the
+                // change belongs to it (checked BEFORE Stale: a new set that has caught up with the old numbers is not the cached one).
+                if (s != null) ExpireWindow(s.AtMs);
+                AtomSpectraRestEpoch refEpoch = lastEpoch ?? (ownReset ? epochBeforeOwnReset : null);
+                string change = s != null && s.HasData && s.Epoch != null ? s.Epoch.ChangeFrom(refEpoch) : null;
                 if (change != null && !ownReset)
                 {
                     EpochChanges++;
                     LastEpochChange = change;
                     return Trip("board reset: " + change);
                 }
-                if (change != null)
-                {
-                    afterReset = false;
-                    if (armed && !absorbed)
-                    {
-                        absorbed = true;   // the new acquisition came before the request returned: start over from this snapshot
-                        hasLast = false; lastBins = null; histFromSample = false; lastHistOk = 0;
-                    }
-                }
+                if (change != null) AbsorbChange(change, s.AtMs);
 
-                if (afterReset && s != null && s.HasData && s.Time >= staleTime && s.Total >= staleTotal)
+                // no reference epoch (Start over with probes that carry none): the first snapshot with an epoch is the reference
+                if (afterReset && s != null && s.HasData && s.Time >= staleTime && s.Total >= staleTotal && !(s.Epoch != null && refEpoch == null))
                 {
                     return AtomSpectraRestUpdate.Stale;   // the cached snapshot from before our reset: ignored
                 }
@@ -392,11 +446,6 @@ namespace BecquerelMonitor
                 lastHistOk = s.HistOk;
                 lastBins = s.Bins;
                 if (s.Epoch != null) lastEpoch = s.Epoch;
-                if (!armed || absorbed)
-                {
-                    ownReset = false;   // the first snapshot that is taken after our own reset ends the allowance for a change of epoch
-                    epochBeforeOwnReset = null;
-                }
                 histFromSample = true;
                 return AtomSpectraRestUpdate.Apply;
             }

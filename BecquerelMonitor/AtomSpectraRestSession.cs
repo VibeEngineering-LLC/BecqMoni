@@ -59,6 +59,8 @@ namespace BecquerelMonitor
         private bool disposed;
         private bool resetReported;
         private bool stallReported;
+        private long noDataSince = -1;        // AtMs of the first 404 of the series in progress
+        private bool noDataReported;
         private AtomSpectraRestBoardSample lastProbe;
         private readonly object acqLock = new object();   // Detach runs on the UI thread (Stop) and on the poll thread (reset/stall)
 
@@ -89,6 +91,7 @@ namespace BecquerelMonitor
             this.periodSeconds = periodSeconds;
             this.observeOnly = observeOnly;
             this.limitSeconds = limitSeconds;
+            guard.Note = delegate(string text) { AtomSpectraTcpLog.Info("Session", text); };
         }
 
         public string TransportName { get { return "REST"; } }
@@ -175,6 +178,8 @@ namespace BecquerelMonitor
             elapsedAtBegin = 0;
             resetReported = false;
             stallReported = false;
+            noDataSince = -1;
+            noDataReported = false;
             // [deferred reset: none] - a failed Clear leaves nothing behind for this Start (pass B, N3)
 
             string err;
@@ -461,10 +466,11 @@ namespace BecquerelMonitor
                 return false;
             }
 
-            guard.ExpectOwnReset();   // P1-1: polling goes on while the request is in flight; a new epoch in that window is OUR reset's answer
-            AtomSpectraRestResponse r;
-            try { r = client.Reset(commandTimeoutMs); }
-            catch { guard.CancelOwnReset(); throw; }
+            // P1-1: polling goes on while the request is in flight; a new epoch in that window is OUR reset's answer.
+            // An unknown outcome (exception, lost answer) keeps the window to its term; only a certain "not done" withdraws it.
+            AtomSpectraRestAcquisition running = acquisition;
+            guard.ExpectOwnReset(running != null ? running.NowMs : -1);
+            AtomSpectraRestResponse r = client.Reset(commandTimeoutMs);
             if (r.Accepted && r.SentFalse)
             {
                 guard.CancelOwnReset();
@@ -483,7 +489,7 @@ namespace BecquerelMonitor
                 return true;
             }
 
-            guard.CancelOwnReset();
+            if (r.NotSent) guard.CancelOwnReset();   // the request certainly never reached the board
             lastError = r.Error ?? ("answered " + r.Status + " " + r.Body);
             Failure = AtomSpectraRestFailure.ResetRefused;
             // [clear failed]
@@ -563,9 +569,27 @@ namespace BecquerelMonitor
             }
         }
 
+        // A series of 404 longer than 3 periods in force: ONE log line and the status "board has no data yet" (no error, no Trip, no stop);
+        // the next snapshot with data ends the series (the controller's status text takes over at once).
+        private void NoDataSignal(AtomSpectraRestUpdate u, AtomSpectraRestBoardSample sample, AtomSpectraRestAcquisition running)
+        {
+            if (sample == null) return;
+            if (sample.HasData) { noDataSince = -1; noDataReported = false; return; }
+            if (u != AtomSpectraRestUpdate.NoData) return;
+            if (noDataSince < 0) noDataSince = sample.AtMs;
+            long period = running != null ? running.EffectivePeriodMs : 1000;
+            if (noDataReported || sample.AtMs - noDataSince <= 3 * period) return;
+            noDataReported = true;
+            AtomSpectraTcpLog.Info("Session", "board has no data yet: HTTP 404 for " + (sample.AtMs - noDataSince) / 1000 + " s (a reset board answers 404 until its first sweep); polling goes on");
+            AtomSpectraTcpLog.SetStatus(TransportName, Host + ":" + Port, "board has no data yet");
+        }
+
         private void OnSampled(object sender, AtomSpectraRestSampleArgs e)
         {
+            AtomSpectraRestAcquisition running = acquisition;
+            if (running != null) guard.PeriodMs = running.EffectivePeriodMs;
             AtomSpectraRestUpdate u = guard.Check(e.Sample);
+            NoDataSignal(u, e.Sample, running);
             if (guard.EpochChanges != epochChangesSeen)
             {
                 epochChangesSeen = guard.EpochChanges;   // F5 (plan K2): logged once per change
