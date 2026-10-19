@@ -234,6 +234,9 @@ namespace BecquerelMonitor
         private int windowChanges, changesSinceExpect;
         private long pendingT0 = -1;              // t0 of a repeated Clear, taken over when its request is confirmed
         private bool openedByExpect, windowPrior;   // an ExpectOwnReset is pending (not yet confirmed / cancelled); a window was open before it
+        private bool priorOpened;                 // E5: openedByExpect of the older window before a repeated Clear took the flag (NotSent gives it back)
+        private int priorSince;                   // E5: changesSinceExpect of the older window
+        private long windowKeepAt = -1;           // E6: a confirmed repeated Clear keeps the window to max(30 s, ...) from its t0 until an answer comes (-2: the first snapshot sets it)
         public int PeriodMs = 1000;               // the period in force, set by the session before every Check
         public Action<string> Note;               // log lines of the guard (the session writes them to the log)
 
@@ -259,6 +262,7 @@ namespace BecquerelMonitor
                 windowT0 = -1;
                 windowShiftAt = -1;
                 windowChanges = 0;
+                windowKeepAt = -1;
                 changesSinceExpect = 0;
                 openedByExpect = false;
                 Tripped = false;
@@ -287,6 +291,7 @@ namespace BecquerelMonitor
             lock (sync)
             {
                 windowPrior = ownReset;
+                priorOpened = openedByExpect; priorSince = changesSinceExpect;
                 openedByExpect = true;
                 changesSinceExpect = 0;
                 pendingT0 = nowMs;
@@ -296,6 +301,7 @@ namespace BecquerelMonitor
                 windowT0 = nowMs;
                 windowShiftAt = -1;
                 windowChanges = 0;
+                windowKeepAt = -1;
             }
         }
 
@@ -310,12 +316,15 @@ namespace BecquerelMonitor
         // preTime/preTotal: the board before our reset (Start over knows them from the probes)
         public void ConfirmOwnReset(long preTime, long preTotal)
         {
-            bool done, prior;
-            lock (sync) { done = changesSinceExpect > 0; prior = windowPrior; }
-            if (!done) AcceptReset(preTime, preTotal);
+            // E6: ONE lock for the read and the write (the monitor is re-entrant: AcceptReset takes the same one): a snapshot cannot
+            // slip in between and have its shift wiped
             lock (sync)
             {
-                if (prior && !done) { windowT0 = pendingT0; windowShiftAt = -1; windowChanges = 0; }   // a repeated Clear that went out: a new answer is due
+                bool done = changesSinceExpect > 0, prior = windowPrior;
+                if (!done) AcceptReset(preTime, preTotal);
+                // a repeated Clear that went out: a new answer is due. windowT0/the shift/the count of the older window are NOT overwritten;
+                // the window is only kept for the term of the new opening
+                if (prior && !done) windowKeepAt = pendingT0 < 0 ? -2 : pendingT0;
                 openedByExpect = false;
             }
         }
@@ -327,7 +336,14 @@ namespace BecquerelMonitor
             lock (sync)
             {
                 if (!openedByExpect) return;
-                if (windowPrior || changesSinceExpect > 0) { openedByExpect = false; return; }   // the older window was never touched: it is back as it was
+                if (windowPrior)
+                {
+                    // E5: the older window is back with ITS state: the flag of an unknown outcome (Clear 1 without confirmation) stays
+                    openedByExpect = priorOpened;
+                    changesSinceExpect += priorSince;
+                    return;
+                }
+                if (changesSinceExpect > 0) { openedByExpect = false; return; }   // the window absorbed an answer already: it stays
                 ownReset = false;
                 epochBeforeOwnReset = null;
                 windowT0 = -1;
@@ -371,6 +387,8 @@ namespace BecquerelMonitor
             if (!ownReset) return;
             if (windowT0 < 0) windowT0 = at;
             long term = windowShiftAt >= 0 ? windowShiftAt + Math.Max(6000L, 2L * PeriodMs) : windowT0 + Math.Max(30000L, 2L * PeriodMs + 10000L);
+            if (windowKeepAt == -2) windowKeepAt = at;
+            if (windowKeepAt >= 0) term = Math.Max(term, windowKeepAt + Math.Max(30000L, 2L * PeriodMs + 10000L));   // E6: a confirmed repeated Clear awaits its answer
             if (at <= term) return;
             ownReset = false;
             epochBeforeOwnReset = null;
@@ -386,6 +404,7 @@ namespace BecquerelMonitor
             windowChanges++;
             changesSinceExpect++;
             windowShiftAt = at;
+            windowKeepAt = -1;
             hasLast = false; lastBins = null; histFromSample = false; lastHistOk = 0;
             if (windowChanges >= 2 && Note != null) Note("external reset swallowed by own-reset window: " + change);
         }

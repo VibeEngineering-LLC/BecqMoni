@@ -710,10 +710,29 @@ namespace BecquerelMonitor
                 result.NotSent = AtomSpectraRestResponse.IsNotSent(ex as WebException) || bodyPending;
                 result.Error = ex.Message;
             }
+            finally
+            {
+                if (connectionGroup != null && method == "GET") CloseConnections(connectionGroup);   // E3
+            }
 
             result.ElapsedMs = sw.ElapsedMilliseconds;
             LogRequest(method, path, withToken, result);
             return result;
+        }
+
+        // E2/E3: closes the connections of a group of this board ("" / null = the default group of the polls). A repeated attempt has a group
+        // of its own, closed after the attempt, so the groups do not pile up in the service point; the failed first attempt is closed
+        // before the repeat, so the board never serves two connections of one poll.
+        public void CloseConnections(string group)
+        {
+            try
+            {
+                ServicePointManager.FindServicePoint(new Uri(BaseUrl + "/"), UseSystemProxy ? WebRequest.DefaultWebProxy : null).CloseConnectionGroup(group ?? "");
+            }
+            catch (Exception)
+            {
+                // a service point that cannot be found has nothing to close
+            }
         }
 
         // gzip / deflate by Content-Encoding; anything else is returned as it came
@@ -727,8 +746,19 @@ namespace BecquerelMonitor
             using (MemoryStream output = new MemoryStream())
             {
                 unzip.CopyTo(output);
+                if (encoding == "gzip") CheckGzipTrailer(wire, output.Length);
                 return output.ToArray();
             }
+        }
+
+        // A gzip body cut short (the connection closed, or the board stopped writing) is not a whole answer: the framework's GZipStream
+        // may hand back what it decoded without a word, so the trailer (RFC 1952: CRC32, then ISIZE = the length mod 2^32) is checked.
+        // The error makes the attempt a failed one (the poll repeats it inside its period).
+        private static void CheckGzipTrailer(byte[] wire, long decodedLength)
+        {
+            if (wire.Length < 18) throw new System.IO.InvalidDataException("gzip body is cut short (" + wire.Length + " B)");
+            uint isize = BitConverter.ToUInt32(wire, wire.Length - 4);
+            if (isize != (uint)(decodedLength & 0xFFFFFFFFL)) throw new System.IO.InvalidDataException("gzip body is cut short (the trailer does not match: " + isize + " <> " + decodedLength + ")");
         }
 
         private string AuthorizationHeader()

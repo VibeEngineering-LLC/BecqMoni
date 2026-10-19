@@ -402,6 +402,8 @@ namespace BecquerelMonitor
 
                     AtomSpectraTcpLog.Warn("REST", "poll failed (" + cf + " in a row): " + error);
 
+                    // E4: ANY HTTP answer (401, 500, 503, a body that does not parse) is the board answering: the silence does not build up
+                    if (r.Status > 0) MarkAnswered();
                     // The link is lost only by SILENCE (letter of Codeaudit 18.10): no answer for max(3 periods, 15 s); the period is the larger of
                     // the configured one and the one in force. The count of failures in a row is not used: they come fast when a board refuses.
                     long silentMs = NowMs - Interlocked.Read(ref _lastAnsweredMs);
@@ -473,6 +475,7 @@ namespace BecquerelMonitor
                 Judge(r, out data, out error);
                 if (!Repeatable(r, error) || n >= attempts || spent.ElapsedMilliseconds + RetryPauseMs + attemptMs > period) return;
                 Interlocked.Increment(ref _retries);
+                _client.CloseConnections(null);   // E2: the connection of the failed attempt is closed before the repeat
                 AtomSpectraTcpLog.Info("REST", "poll attempt " + n + " of " + attempts + " failed (" + error + "), repeated inside the period");
                 if (_stopEvent.WaitOne(RetryPauseMs)) return;
             }
