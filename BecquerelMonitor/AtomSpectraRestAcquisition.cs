@@ -402,8 +402,6 @@ namespace BecquerelMonitor
 
                     AtomSpectraTcpLog.Warn("REST", "poll failed (" + cf + " in a row): " + error);
 
-                    // E4: ANY HTTP answer (401, 500, 503, a body that does not parse) is the board answering: the silence does not build up
-                    if (r.Status > 0) MarkAnswered();
                     // The link is lost only by SILENCE (letter of Codeaudit 18.10): no answer for max(3 periods, 15 s); the period is the larger of
                     // the configured one and the one in force. The count of failures in a row is not used: they come fast when a board refuses.
                     long silentMs = NowMs - Interlocked.Read(ref _lastAnsweredMs);
@@ -457,6 +455,7 @@ namespace BecquerelMonitor
         {
             if (r.Status == 404) return false;
             if (error == null) return false;
+            if (r.BodyBroken) return true;   // Zh3: a body cut short or corrupt (the status is the board's, it did answer)
             if (r.Status == 0) return !r.NotSent;   // a refused connect (NotSent) is not repeated: nothing listens, a pause of 0.2 s changes nothing
             return r.Ok && error.StartsWith("parse exception");
         }
@@ -472,8 +471,14 @@ namespace BecquerelMonitor
             for (int n = 1; ; n++)
             {
                 r = n == 1 ? _client.Get(SpectrumPath, attempts > 1 ? attemptMs : DeadlineMs) : _client.Get(SpectrumPath, attemptMs, "retry-" + Guid.NewGuid().ToString("N"));
+                // E4/Zh5: ANY HTTP answer of ANY attempt (401, 500, 503, a body that does not parse) is the board answering: the silence does not build up
+                if (r.Status > 0) MarkAnswered();
                 Judge(r, out data, out error);
-                if (!Repeatable(r, error) || n >= attempts || spent.ElapsedMilliseconds + RetryPauseMs + attemptMs > period) return;
+                if (!Repeatable(r, error) || n >= attempts || spent.ElapsedMilliseconds + RetryPauseMs + attemptMs > period)
+                {
+                    if (error != null) { _client.CloseConnections(""); }   // Zh4: the connection of the LAST failed attempt is closed as well
+                    return;
+                }
                 Interlocked.Increment(ref _retries);
                 _client.CloseConnections(null);   // E2: the connection of the failed attempt is closed before the repeat
                 AtomSpectraTcpLog.Info("REST", "poll attempt " + n + " of " + attempts + " failed (" + error + "), repeated inside the period");

@@ -411,6 +411,7 @@ namespace BecquerelMonitor
         public string ContentEncoding;
         public long ElapsedMs;
         public string Error;
+        public bool BodyBroken;   // Zh3: the board answered (Status is kept) but the body was cut short or corrupt (gzip)
 
         private static bool BodySaysRefused(string body)
         {
@@ -618,7 +619,7 @@ namespace BecquerelMonitor
 
                 if (SendAcceptEncoding)
                 {
-                    req.Headers[HttpRequestHeader.AcceptEncoding] = "gzip, deflate";
+                    req.Headers[HttpRequestHeader.AcceptEncoding] = "gzip";   // Zh9: the board sends gzip only
                 }
 
                 string auth = AuthorizationHeader();
@@ -684,14 +685,17 @@ namespace BecquerelMonitor
                                 while ((bytesRead = respStream.Read(buffer, 0, buffer.Length)) > 0)
                                 {
                                     ms.Write(buffer, 0, bytesRead);
+                                    if (ms.Length > MaxBodyBytes) break;   // Zh2: no more is read than the limit
                                 }
                                 // 2026-10-16: ms holds the bytes as they came over the network; gzip/deflate are decoded here
                                 result.WireBytes = (int)ms.Length;
                                 result.ContentEncoding = (resp.ContentEncoding ?? "").Trim().ToLowerInvariant();
                                 result.SpectrometerDead = (resp.Headers["X-Spectrometer-Dead"] ?? "").Trim() == "1";
-                                byte[] decoded = Decode(ms.ToArray(), result.ContentEncoding);
+                                string problem; bool broken;
+                                byte[] decoded = Decode(ms.ToArray(), result.ContentEncoding, out problem, out broken);
                                 result.BodyBytes = decoded.Length;
                                 result.Body = Encoding.UTF8.GetString(decoded);
+                                if (problem != null) { result.Error = problem; result.BodyBroken = broken; }   // Zh3: the status stays
                             }
                         }
 
@@ -735,25 +739,49 @@ namespace BecquerelMonitor
             }
         }
 
-        // gzip / deflate by Content-Encoding; anything else is returned as it came
-        private static byte[] Decode(byte[] wire, string encoding)
+        // Zh2: a body over this size (read from the wire or decoded) is refused; the spectrum of N=8192 is about 26 KB
+        public const int MaxBodyBytes = 1 << 20;
+
+        // gzip / deflate by Content-Encoding; anything else is returned as it came. problem != null: the body is not handed on;
+        // broken: it was cut short or corrupt (the attempt is repeated), otherwise it is over the limit (it is not).
+        private static byte[] Decode(byte[] wire, string encoding, out string problem, out bool broken)
         {
+            problem = null;
+            broken = false;
+            if (wire.Length > MaxBodyBytes) { problem = "body is over the limit of " + MaxBodyBytes + " B"; return new byte[0]; }
             if (encoding != "gzip" && encoding != "deflate") return wire;
-            using (MemoryStream input = new MemoryStream(wire))
-            using (Stream unzip = encoding == "gzip"
-                ? (Stream)new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress)
-                : new System.IO.Compression.DeflateStream(input, System.IO.Compression.CompressionMode.Decompress))
-            using (MemoryStream output = new MemoryStream())
+            try
             {
-                unzip.CopyTo(output);
-                if (encoding == "gzip") CheckGzipTrailer(wire, output.Length);
-                return output.ToArray();
+                using (MemoryStream input = new MemoryStream(wire))
+                using (Stream unzip = encoding == "gzip"
+                    ? (Stream)new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress)
+                    : new System.IO.Compression.DeflateStream(input, System.IO.Compression.CompressionMode.Decompress))
+                using (MemoryStream output = new MemoryStream())
+                {
+                    byte[] chunk = new byte[8192];
+                    int n;
+                    while ((n = unzip.Read(chunk, 0, chunk.Length)) > 0)
+                    {
+                        output.Write(chunk, 0, n);
+                        if (output.Length > MaxBodyBytes) { problem = "decoded body is over the limit of " + MaxBodyBytes + " B"; return new byte[0]; }
+                    }
+                    if (encoding == "gzip") CheckGzipTrailer(wire, output.Length);
+                    return output.ToArray();
+                }
+            }
+            catch (System.IO.InvalidDataException ex)
+            {
+                problem = ex.Message;
+                broken = true;
+                return new byte[0];
             }
         }
 
         // A gzip body cut short (the connection closed, or the board stopped writing) is not a whole answer: the framework's GZipStream
         // may hand back what it decoded without a word, so the trailer (RFC 1952: CRC32, then ISIZE = the length mod 2^32) is checked.
         // The error makes the attempt a failed one (the poll repeats it inside its period).
+        // CRC32 is checked by the framework's GZipStream itself (a wrong one throws InvalidDataException: test f5-gz-bad-crc, Zh1); one gzip member is
+        // assumed (the board sends one): of several members the ISIZE of the last one would not match the whole output.
         private static void CheckGzipTrailer(byte[] wire, long decodedLength)
         {
             if (wire.Length < 18) throw new System.IO.InvalidDataException("gzip body is cut short (" + wire.Length + " B)");
