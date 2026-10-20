@@ -682,17 +682,30 @@ namespace BecquerelMonitor
                             {
                                 byte[] buffer = new byte[4096];
                                 int bytesRead;
-                                while ((bytesRead = respStream.Read(buffer, 0, buffer.Length)) > 0)
+                                string readProblem = null;   // Z1: a body that breaks off AFTER the status keeps the status
+                                try
                                 {
-                                    ms.Write(buffer, 0, bytesRead);
-                                    if (ms.Length > MaxBodyBytes) break;   // Zh2: no more is read than the limit
+                                    while ((bytesRead = respStream.Read(buffer, 0, buffer.Length)) > 0)
+                                    {
+                                        ms.Write(buffer, 0, bytesRead);
+                                        if (ms.Length > MaxBodyBytes) break;   // Zh2: no more is read than the limit
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    readProblem = "body read broke off: " + ex.Message;
+                                }
+                                if (readProblem == null && ms.Length <= MaxBodyBytes && resp.ContentLength >= 0 && ms.Length < resp.ContentLength)
+                                {
+                                    readProblem = "body cut short: " + ms.Length + " of " + resp.ContentLength + " B";   // closed early, no exception
                                 }
                                 // 2026-10-16: ms holds the bytes as they came over the network; gzip/deflate are decoded here
                                 result.WireBytes = (int)ms.Length;
                                 result.ContentEncoding = (resp.ContentEncoding ?? "").Trim().ToLowerInvariant();
                                 result.SpectrometerDead = (resp.Headers["X-Spectrometer-Dead"] ?? "").Trim() == "1";
-                                string problem; bool broken;
-                                byte[] decoded = Decode(ms.ToArray(), result.ContentEncoding, out problem, out broken);
+                                string problem = null; bool broken = false;
+                                byte[] decoded = readProblem != null ? new byte[0] : Decode(ms.ToArray(), result.ContentEncoding, out problem, out broken);
+                                if (readProblem != null) { problem = readProblem; broken = true; }
                                 result.BodyBytes = decoded.Length;
                                 result.Body = Encoding.UTF8.GetString(decoded);
                                 if (problem != null) { result.Error = problem; result.BodyBroken = broken; }   // Zh3: the status stays
@@ -701,7 +714,7 @@ namespace BecquerelMonitor
 
                         if (result.Status < 200 || result.Status >= 300)
                         {
-                            result.Error = "HTTP " + result.Status;
+                            if (result.Error == null) result.Error = "HTTP " + result.Status;   // Z2: the reason of a broken body is not overwritten
                         }
                     }
                 }
