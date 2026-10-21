@@ -222,7 +222,9 @@ namespace BecquerelMonitor
 
     public sealed class AtomSpectraRestAcquisition : IDisposable
     {
-        public const int LinkLostAfterFailures = 3;   // no longer used for the decision (silence only); kept as it was part of the class
+        // gz-4/K1: this many failures IN A ROW, each of them an answer of the board (503, a body that does not parse), = the link is lost
+        // (the other way to lose it is silence, see LinkLostFloorMs); the polling goes on either way
+        public const int LinkLostAfterFailures = 3;
         public static int LinkLostFloorMs = 15000;    // the least silence that is a lost link (a test lowers it to keep a short outage scenario)
         public const int MinDeadlineMs = 2000;
         public const int StatsEveryMs = 5000;
@@ -239,6 +241,7 @@ namespace BecquerelMonitor
         private volatile bool _alive;
         private volatile bool _linkLost;
         private int _consecutiveFailures;
+        private int _answeredFailures;                      // gz-4/K1: failures in a row that were answers of the board (reset by a good poll or by silence)
         private int _attempts;
         private int _successes;
         private int _failures;
@@ -383,7 +386,7 @@ namespace BecquerelMonitor
                 if (r.Status == 404)
                 {
                     Interlocked.Increment(ref _noData);
-                    MarkAnswered();
+                    MarkGood();
                     AtomSpectraRestBoardSample none = AtomSpectraRestBoardSample.NoData(NowMs);
                     _lastSample = none;
                     AtomSpectraTcpLog.Info("REST", "404 No spectrum data yet" + (r.SpectrometerDead ? " (X-Spectrometer-Dead)" : "") + ": the board has no spectrum, the link is fine");
@@ -406,10 +409,12 @@ namespace BecquerelMonitor
                     // the configured one and the one in force. The count of failures in a row is not used: they come fast when a board refuses.
                     long silentMs = NowMs - Interlocked.Read(ref _lastAnsweredMs);
                     bool silent = silentMs >= Math.Max(3L * Math.Max(_periodMs, periodInForce), (long)LinkLostFloorMs);
-                    if (silent && !_linkLost)
+                    // gz-4/K1: and by LinkLostAfterFailures failures in a row that were all ANSWERS (a board that answers 503 for ever is no link)
+                    int answeredInRow = r.Status > 0 ? Interlocked.Increment(ref _answeredFailures) : Interlocked.Exchange(ref _answeredFailures, 0);
+                    if ((silent || answeredInRow >= LinkLostAfterFailures) && !_linkLost)
                     {
                         _linkLost = true;
-                        AtomSpectraTcpLog.Error("REST", "link lost after " + cf + " failed polls, " + silentMs + " ms without an answer");
+                        AtomSpectraTcpLog.Error("REST", "link lost after " + cf + " failed polls, " + silentMs + " ms without an answer, " + answeredInRow + " answered failures in a row");
                         RaiseLinkLost();
                     }
 
@@ -418,7 +423,7 @@ namespace BecquerelMonitor
 
                 Interlocked.Increment(ref _successes);
                 _last = data;
-                MarkAnswered();
+                MarkGood();
                 PeriodAfter(true);
                 AtomSpectraRestBoardSample sample = AtomSpectraRestSpectrum.ToSample(data, NowMs);
                 _lastSample = sample;
@@ -501,7 +506,14 @@ namespace BecquerelMonitor
 
         private void MarkAnswered()
         {
-            Interlocked.Exchange(ref _lastAnsweredMs, NowMs);   // a snapshot or a 404: the board answers
+            Interlocked.Exchange(ref _lastAnsweredMs, NowMs);   // any answer of the board (503, a bad body too): the silence does not build up
+        }
+
+        // gz-4/K1: only a GOOD poll (a snapshot or a 404 "no data yet") restores the link and ends the run of failures; a failing answer does not
+        private void MarkGood()
+        {
+            MarkAnswered();
+            Interlocked.Exchange(ref _answeredFailures, 0);
             if (_linkLost)
             {
                 _linkLost = false;

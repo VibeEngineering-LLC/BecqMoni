@@ -15,7 +15,8 @@ namespace BecquerelMonitor
         StartRefused,
         ObserveOnly,
         HeadlessBehind,
-        DocumentNotEmpty    // pass A N2: "Start over" is refused in a document that holds data
+        DocumentNotEmpty,   // pass A N2: "Start over" is refused in a document that holds data
+        HeadlessAsk         // gz-4/K2: a stopped board with data and no window to ask in: refused, no -sta
     }
 
     public sealed class AtomSpectraRestStartQuestion
@@ -206,6 +207,15 @@ namespace BecquerelMonitor
             counting = AtomSpectraRestPolicy.IsCounting(first, second);
 
             AtomSpectraRestStartPlan plan = AtomSpectraRestPolicy.PlanStart(observeOnly, Ask != null, counting, second, DocumentSeconds, DocumentCounts);
+
+            if (plan == AtomSpectraRestStartPlan.Ask && Ask == null)
+            {
+                // gz-4/K2: nobody to ask (headless) and the board is stopped with data: no -sta, the Start is refused
+                LastPlan = plan;
+                Failure = AtomSpectraRestFailure.HeadlessAsk;
+                lastError = "the board is stopped and holds a measurement; there is no window to ask what to do with it";
+                return AtomSpectraTcpBeginOutcome.Refused;
+            }
 
             if (plan == AtomSpectraRestStartPlan.Ask)
             {

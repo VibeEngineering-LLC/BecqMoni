@@ -148,8 +148,9 @@ namespace BecquerelMonitor
             if (!hasWindows)
             {
                 if (behind) return AtomSpectraRestStartPlan.RefuseHeadless;
-                // pass A N7 (plan 9.1): a stopped board with data gets -sta without a reset, a counting one is joined
-                return !counting && BoardHasData(board) ? AtomSpectraRestStartPlan.Resume : AtomSpectraRestStartPlan.Join;
+                // pass A N7 (plan 9.1): a counting board is joined; gz-4/K2 (operator 2026-10-21): a STOPPED board with data is not started
+                // without a question (was Resume = -sta) - the plan is Ask, and where there is no window to ask in, the Session refuses
+                return !counting && BoardHasData(board) ? AtomSpectraRestStartPlan.Ask : AtomSpectraRestStartPlan.Join;
             }
 
             return AtomSpectraRestStartPlan.Ask;

@@ -376,17 +376,6 @@ namespace BecquerelMonitor
                 return;
             }
 
-            AtomSpectraRestDataReadyArgs restSnapshot = e as AtomSpectraRestDataReadyArgs;
-            if (boardCalibrationPending && restSnapshot != null)
-            {
-                // 2026-10-16 (operator): the board calibration of the first snapshot after Start -> the document and the configuration
-                boardCalibrationPending = false;
-                // F5 (plan K4): "calib" is for calib_channels; the document has e.Histogram.Length channels (board or client fold)
-                double[] slots = AtomSpectraRestCalibration.ForChannels(restSnapshot.Calibration, restSnapshot.CalibChannels, e.Histogram.Length);
-                AtomSpectraTcpLog.Info("Cal", ApplyBoardCalibration(spectrum, resultData.DeviceConfig, slots,
-                    c => DeviceConfigManager.GetInstance().SaveConfig(c)));
-            }
-
             if (e.Histogram.Length != spectrum.Spectrum.Length && session is AtomSpectraRestSession)
             {
                 // REST: detach without -sto (pass B N12) - the board keeps counting, the document is not touched
@@ -409,9 +398,20 @@ namespace BecquerelMonitor
                 return;
             }
 
+            // gz-4/K3: AFTER the length checks above - a snapshot that is refused must not have rewritten the calibration and the configuration file
+            AtomSpectraRestDataReadyArgs restSnapshot = e as AtomSpectraRestDataReadyArgs;
+            if (boardCalibrationPending && restSnapshot != null)
+            {
+                // 2026-10-16 (operator): the board calibration of the first snapshot after Start -> the document and the configuration
+                boardCalibrationPending = false;
+                // F5 (plan K4): "calib" is for calib_channels; the document has e.Histogram.Length channels (board or client fold)
+                double[] slots = AtomSpectraRestCalibration.ForChannels(restSnapshot.Calibration, restSnapshot.CalibChannels, e.Histogram.Length);
+                AtomSpectraTcpLog.Info("Cal", ApplyBoardCalibration(spectrum, resultData.DeviceConfig, slots, configSaver));
+            }
+
             Array.Copy(e.Histogram, spectrum.Spectrum, e.Histogram.Length);
 
-            long sum = e.Histogram.Sum(x => (long)x);
+            long sum =e.Histogram.Sum(x => (long)x);
             spectrum.TotalPulseCount = sum + e.InvalidPulses;
             spectrum.ValidPulseCount = sum;
             spectrum.ChannelPitch = 1;

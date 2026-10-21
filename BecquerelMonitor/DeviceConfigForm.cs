@@ -2142,7 +2142,7 @@ namespace BecquerelMonitor
                 AtomSpectraTcpCalibrationReader.ReadIntoFormAsync((AtomSpectraTcpDeviceConfig)asked.InputDeviceConfig, this, this.button13,
                     () => ReferenceEquals(asked, this.activeDeviceConfig), () => (PolynomialEnergyCalibration)asked.EnergyCalibration,
                     new System.Windows.Forms.Control[] { this.numericUpDown7, this.numericUpDown2, this.numericUpDown1, this.numericUpDown9, this.numericUpDown8 },
-                    SetActiveDeviceConfigDirty);
+                    SetActiveDeviceConfigDirty, () => asked.NumberOfChannels);   // gz-4/K4: the channels of the profile edited
             }
         }
 

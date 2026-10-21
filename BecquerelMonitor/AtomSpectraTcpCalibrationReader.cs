@@ -373,7 +373,7 @@ namespace BecquerelMonitor
         // (the resources of the COM branch) or the fields filled as the COM branch does (DeviceConfigForm.cs:1977-2000).
         // fieldsInOrder: [0] numericUpDown7, [1] numericUpDown2, [2] numericUpDown1, [3] numericUpDown9, [4] numericUpDown8.
         public static void ReadIntoFormAsync(AtomSpectraTcpDeviceConfig config, Control owner, Control button, Func<bool> stillCurrent,
-            Func<PolynomialEnergyCalibration> calibration, Control[] fieldsInOrder, Action markDirty)
+            Func<PolynomialEnergyCalibration> calibration, Control[] fieldsInOrder, Action markDirty, Func<int> channels = null)
         {
             button.Enabled = false;
             ReadAsync(config, owner, delegate (AtomSpectraTcpCalibrationResult result)
@@ -382,9 +382,26 @@ namespace BecquerelMonitor
                 if (!stillCurrent()) return;      // another device config was selected meanwhile
                 string error = Describe(result, config);
                 if (error != null) { MessageBox.Show(error); return; }
-                ApplyToFields(calibration(), result.Coefficients, fieldsInOrder);
-                markDirty();
+                if (!ApplyResult(result, config, calibration, fieldsInOrder, markDirty, channels))
+                    MessageBox.Show("The calibration of the board is not taken: its scale at " + (channels == null ? 0 : channels()) + " channels is not established. The page keeps its own.");
             });
+        }
+
+        // the board's answer given to the page: a seam for the tests (no worker thread, no form)
+        internal static bool ApplyResult(AtomSpectraTcpCalibrationResult result, AtomSpectraTcpDeviceConfig config,
+            Func<PolynomialEnergyCalibration> calibration, Control[] fieldsInOrder, Action markDirty, Func<int> channels)
+        {
+            // gz-4/K4: the page edits the profile of N channels. REST: the board's 8192-channel polynomial folded to N (the same point as at Start);
+            // TCP: the scale of -cal at N other than 8192 is not established, so the button takes nothing (false = not taken, the caller says so)
+            int n = channels == null ? 0 : channels();
+            double[] coefficients = result.Coefficients;
+            bool rest = config != null && config.Transport == AtomSpectraTransport.Rest;
+            if (rest && n > 0) coefficients = AtomSpectraRestCalibration.ForChannels(coefficients, 0, n);
+            else if (!rest && n > 0 && n != AtomSpectraRestSpectrum.Channels) coefficients = null;
+            if (coefficients == null) return false;
+            ApplyToFields(calibration(), coefficients, fieldsInOrder);
+            markDirty();
+            return true;
         }
 
         // 2026-10-16: the model AND the fields of the Energy Calibration page (SaveFormContents reads the fields back)
