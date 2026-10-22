@@ -63,7 +63,7 @@ namespace BecquerelMonitor
             Uri u;
             if (!Uri.TryCreate(url, UriKind.Absolute, out u)
                 || (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps)
-                || string.IsNullOrEmpty(u.Host) || !string.IsNullOrEmpty(u.UserInfo))   // pass B P-2: no user:pass in the URL
+                || string.IsNullOrEmpty(u.Host) || !string.IsNullOrEmpty(u.UserInfo))   // no user:pass in the URL
             {
                 error = "invalid board URL (user:password in a URL is not allowed, use the authorization fields): " + AtomSpectraTcpLog.Mask(url);
                 return null;
@@ -81,7 +81,7 @@ namespace BecquerelMonitor
         public string RestSessionKey()
         {
             return EffectiveRestUrl() + "|" + RestPollSeconds + "|" + RestObserveOnly + "|" + RestLimitSeconds + "|" + RestNoProxy
-                + "|" + RestAuthKind + "|" + RestAuthUser + "|" + (RestAuthSecret ?? "").GetHashCode();   // pass A N6: not the DPAPI text, it differs on every save
+                + "|" + RestAuthKind + "|" + RestAuthUser + "|" + (RestAuthSecret ?? "").GetHashCode();   // not the DPAPI text, it differs on every save
         }
 
         public static bool IsValidRestUrl(string url)

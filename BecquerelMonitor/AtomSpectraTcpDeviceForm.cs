@@ -29,9 +29,9 @@ namespace BecquerelMonitor
         {
             InitializeComponent();
             BuildRestControls();
-            BuildConsoleControls();   // 2026-10-16: address, Refresh, command line (AtomSpectraTcpDeviceForm.Console.cs)
+            BuildConsoleControls();   // address, Refresh, command line (AtomSpectraTcpDeviceForm.Console.cs)
             ApplyTexts();
-            ApplyLayout();   // 2026-10-16: fills the page, follows its width (AtomSpectraTcpDeviceForm.Layout.cs)
+            ApplyLayout();   // fills the page, follows its width (AtomSpectraTcpDeviceForm.Layout.cs)
         }
 
         public AtomSpectraTcpDeviceForm(DeviceConfigForm deviceConfigForm) : base(deviceConfigForm)
@@ -39,9 +39,9 @@ namespace BecquerelMonitor
             formLoading = true;
             InitializeComponent();
             BuildRestControls();
-            BuildConsoleControls();   // 2026-10-16: address, Refresh, command line (AtomSpectraTcpDeviceForm.Console.cs)
+            BuildConsoleControls();   // address, Refresh, command line (AtomSpectraTcpDeviceForm.Console.cs)
             ApplyTexts();
-            ApplyLayout();   // 2026-10-16: fills the page, follows its width (AtomSpectraTcpDeviceForm.Layout.cs)
+            ApplyLayout();   // fills the page, follows its width (AtomSpectraTcpDeviceForm.Layout.cs)
             base.DeviceTypeString = Resources.DeviceTypeAtomSpectraTCP;
             formLoading = false;
         }
@@ -72,7 +72,7 @@ namespace BecquerelMonitor
                 numericPort.Value = val;
 
                 deadTime = config.DeadTimeValue;
-                labelDeadTime.Text = string.Format(CultureInfo.InvariantCulture, Resources.AtomSpectraTcpDeadTimeText, deadTime * 1.0E+06);   // 2026-10-16: 3 decimals (13.png)
+                labelDeadTime.Text = string.Format(CultureInfo.InvariantCulture, Resources.AtomSpectraTcpDeadTimeText, deadTime * 1.0E+06);   // 3 decimals
                 LoadRest(config);
                 LoadConsole(config);
             }
@@ -93,7 +93,7 @@ namespace BecquerelMonitor
             string host = textHost.Text.Trim();
             int port = (int)numericPort.Value;
             SaveRest(config);   // throws FormatException on an invalid board URL, after its own message
-            // 2026-10-16 (operator): an EMPTY address is not an error while editing (a new configuration starts empty);
+            // an EMPTY address is not an error while editing (a new configuration starts empty);
             // it is refused at Start and by "Test connection" (ERRAtomSpectraTcpNoHost). A non-empty wrong address is refused here.
             bool addressEmpty = textAddress.Text.Trim().Length == 0;
             if (!RestUrlGiven() && !addressEmpty && (!AtomSpectraTcpDeviceConfig.IsValidHost(host) || port < 1 || port > 65535))
@@ -147,7 +147,7 @@ namespace BecquerelMonitor
             Thread worker = new Thread(() =>
             {
                 string text = RunTest(host, port);
-                AtomSpectraTcpLog.Info("Test", "Test connection (TCP) " + host + ":" + port + ": " + text);   // 2026-10-16: the result goes to the log too
+                AtomSpectraTcpLog.Info("Test", "Test connection (TCP) " + host + ":" + port + ": " + text);   // the result goes to the log too
                 ShowTestResult(generation, text);
             });
             worker.IsBackground = true;

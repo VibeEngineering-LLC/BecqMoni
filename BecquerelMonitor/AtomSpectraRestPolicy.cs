@@ -13,7 +13,7 @@ namespace BecquerelMonitor
         public long HistOk;
         public long AtMs;
         public int[] Bins;          // the channels of the snapshot (null for a sample without data)
-        public AtomSpectraRestEpoch Epoch;   // F5 (plan K2): null when the answer carries no epoch field
+        public AtomSpectraRestEpoch Epoch;   // null when the answer carries no epoch field
 
         public static AtomSpectraRestBoardSample NoData(long atMs)
         {
@@ -28,7 +28,7 @@ namespace BecquerelMonitor
         }
     }
 
-    // F5 (plan K2): the board's epoch, three optional top-level fields of the v2 answer. A change of any of them (growth by
+    // the board's epoch, three optional top-level fields of the v2 answer. A change of any of them (growth by
     // any amount or a drop = one event) is a new acquisition on the board: a new session, never a Trip.
     public sealed class AtomSpectraRestEpoch
     {
@@ -79,7 +79,7 @@ namespace BecquerelMonitor
         Apply,
         NoData,
         Decreased,
-        Stale       // pass A N5: right after OUR reset the 2 s JSON cache still shows the acquisition before it
+        Stale       // right after OUR reset the 2 s JSON cache still shows the acquisition before it
     }
 
     public static class AtomSpectraRestPolicy
@@ -148,8 +148,8 @@ namespace BecquerelMonitor
             if (!hasWindows)
             {
                 if (behind) return AtomSpectraRestStartPlan.RefuseHeadless;
-                // pass A N7 (plan 9.1): a counting board is joined; gz-4/K2 (operator 2026-10-21): a STOPPED board with data is not started
-                // without a question (was Resume = -sta) - the plan is Ask, and where there is no window to ask in, the Session refuses
+                // a counting board is joined; a STOPPED board with data is not started
+                // without a question (was Resume = -sta) - the rule is Ask, and where there is no window to ask in, the Session refuses
                 return !counting && BoardHasData(board) ? AtomSpectraRestStartPlan.Ask : AtomSpectraRestStartPlan.Join;
             }
 
@@ -187,8 +187,8 @@ namespace BecquerelMonitor
         }
     }
 
-    // F5 (plan R5, B6): the effective poll period. A skipped poll doubles it (ceiling 30 s, or the configured period if longer);
-    // 5 full polls in a row halve it, not below the configured period and not below 2 s (the operator 18.10: not more often than configured).
+    // the effective poll period. A skipped poll doubles it (ceiling 30 s, or the configured period if longer);
+    // 5 full polls in a row halve it, not below the configured period and not below 2 s (never more often than configured).
     // Skip/Full: true = the period changed.
     public sealed class AtomSpectraRestPeriod
     {
@@ -206,7 +206,7 @@ namespace BecquerelMonitor
         {
             if (++fullInRow < FullToHalve) return false;
             fullInRow = 0;
-            int next = Math.Max(Math.Max(configuredMs, FloorMs), EffectiveMs / 2);   // decision of the operator 18.10: not more often than configured
+            int next = Math.Max(Math.Max(configuredMs, FloorMs), EffectiveMs / 2);   // never more often than configured
             return Set(Math.Min(EffectiveMs, next));
         }
         private bool Set(int ms) { if (ms == EffectiveMs) return false; EffectiveMs = ms; return true; }
@@ -222,11 +222,11 @@ namespace BecquerelMonitor
         private long lastGrowthMs = -1;
         private bool sawGrowth;
         private bool histFromSample;   // lastHistOk came from the board, not from the document baseline
-        private int[] lastBins;        // pass A N1: channels of the last accepted snapshot
-        private bool afterReset;       // pass A N5: our reset was accepted, the board may still serve the old snapshot
+        private int[] lastBins;        // channels of the last accepted snapshot
+        private bool afterReset;       // our reset was accepted, the board may still serve the old snapshot
         private long staleTime, staleTotal;
-        private AtomSpectraRestEpoch lastEpoch;   // F5 (plan K2): the epoch of the first answer after Start, then of the last one
-        // The window of our own reset (letter "pravilo-okna"): opened BEFORE the reset request goes, judged by the TIME of the snapshots.
+        private AtomSpectraRestEpoch lastEpoch;   // the epoch of the first answer after Start, then of the last one
+        // The window of our own reset: opened BEFORE the reset request goes, judged by the TIME of the snapshots.
         // Any change of the epoch triple inside it belongs to our reset; the first snapshot does not close it. It closes
         // max(6 s, 2 x period) after the last change, or max(30 s, 2 x period + 10 s) after the opening when nothing changed.
         private bool ownReset;                    // the window is open
@@ -235,9 +235,9 @@ namespace BecquerelMonitor
         private int windowChanges, changesSinceExpect;
         private long pendingT0 = -1;              // t0 of a repeated Clear, taken over when its request is confirmed
         private bool openedByExpect, windowPrior;   // an ExpectOwnReset is pending (not yet confirmed / cancelled); a window was open before it
-        private bool priorOpened;                 // E5: openedByExpect of the older window before a repeated Clear took the flag (NotSent gives it back)
-        private int priorSince;                   // E5: changesSinceExpect of the older window
-        private long windowKeepAt = -1;           // E6: a confirmed repeated Clear keeps the window to max(30 s, ...) from its t0 until an answer comes (-2: the first snapshot sets it)
+        private bool priorOpened;                 // openedByExpect of the older window before a repeated Clear took the flag (NotSent gives it back)
+        private int priorSince;                   // changesSinceExpect of the older window
+        private long windowKeepAt = -1;           // a confirmed repeated Clear keeps the window to max(30 s, ...) from its t0 until an answer comes (-2: the first snapshot sets it)
         public int PeriodMs = 1000;               // the period in force, set by the session before every Check
         public Action<string> Note;               // log lines of the guard (the session writes them to the log)
 
@@ -281,7 +281,7 @@ namespace BecquerelMonitor
             AcceptReset(t, n);
         }
 
-        // P1-1: raised BEFORE the reset request is sent. Polling goes on while the request is in flight, and a snapshot with a new
+        // Raised BEFORE the reset request is sent. Polling goes on while the request is in flight, and a snapshot with a new
         // epoch in that window is the answer to our reset, not a board reset from outside.
         public void ExpectOwnReset() { ExpectOwnReset(-1); }
 
@@ -317,7 +317,7 @@ namespace BecquerelMonitor
         // preTime/preTotal: the board before our reset (Start over knows them from the probes)
         public void ConfirmOwnReset(long preTime, long preTotal)
         {
-            // E6: ONE lock for the read and the write (the monitor is re-entrant: AcceptReset takes the same one): a snapshot cannot
+            // ONE lock for the read and the write (the monitor is re-entrant: AcceptReset takes the same one): a snapshot cannot
             // slip in between and have its shift wiped
             lock (sync)
             {
@@ -339,7 +339,7 @@ namespace BecquerelMonitor
                 if (!openedByExpect) return;
                 if (windowPrior)
                 {
-                    // E5: the older window is back with ITS state: the flag of an unknown outcome (Clear 1 without confirmation) stays
+                    // the older window is back with ITS state: the flag of an unknown outcome (Clear 1 without confirmation) stays
                     openedByExpect = priorOpened;
                     changesSinceExpect += priorSince;
                     return;
@@ -353,7 +353,7 @@ namespace BecquerelMonitor
             }
         }
 
-        // preTime/preTotal: the board before our reset; a snapshot not below them is the cached old one (pass A N5).
+        // preTime/preTotal: the board before our reset; a snapshot not below them is the cached old one.
         public void AcceptReset(long preTime, long preTotal)
         {
             AtomSpectraRestEpoch before;
@@ -389,7 +389,7 @@ namespace BecquerelMonitor
             if (windowT0 < 0) windowT0 = at;
             long term = windowShiftAt >= 0 ? windowShiftAt + Math.Max(6000L, 2L * PeriodMs) : windowT0 + Math.Max(30000L, 2L * PeriodMs + 10000L);
             if (windowKeepAt == -2) windowKeepAt = at;
-            if (windowKeepAt >= 0) term = Math.Max(term, windowKeepAt + Math.Max(30000L, 2L * PeriodMs + 10000L));   // E6: a confirmed repeated Clear awaits its answer
+            if (windowKeepAt >= 0) term = Math.Max(term, windowKeepAt + Math.Max(30000L, 2L * PeriodMs + 10000L));   // a confirmed repeated Clear awaits its answer
             if (at <= term) return;
             ownReset = false;
             epochBeforeOwnReset = null;
@@ -419,7 +419,7 @@ namespace BecquerelMonitor
                     return AtomSpectraRestUpdate.Decreased;
                 }
 
-                // F5 (plan K2, decision of the operator 17.10): a changed epoch is a reset of the board, polling stops and the document
+                // a changed epoch is a reset of the board, polling stops and the document
                 // is never overwritten (the same path as a drop of the counters), unless the window of OUR reset is open: then the
                 // change belongs to it (checked BEFORE Stale: a new set that has caught up with the old numbers is not the cached one).
                 if (s != null) ExpireWindow(s.AtMs);
@@ -442,7 +442,7 @@ namespace BecquerelMonitor
 
                 if (s == null || !s.HasData)
                 {
-                    // F5 (plan K6): a board that reports its epoch answers 404 after a reset until the first sweep;
+                    // a board that reports its epoch answers 404 after a reset until the first sweep;
                     // the epoch of the next snapshot tells a new acquisition apart, so the 404 itself is no Trip
                     if (hasLast && (lastTime > 0 || lastTotal > 0) && lastEpoch == null)
                     {
@@ -492,7 +492,7 @@ namespace BecquerelMonitor
             }
         }
 
-        // First channel that went down (-1: none): a continuing acquisition never loses counts in a channel (pass A N1).
+        // First channel that went down (-1: none): a continuing acquisition never loses counts in a channel.
         private static int FirstDecrease(int[] before, int[] now)
         {
             if (before == null || now == null || before.Length != now.Length) return -1;

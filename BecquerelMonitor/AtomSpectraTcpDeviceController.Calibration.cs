@@ -1,4 +1,4 @@
-// 2026-10-16 (operator): at Start the board calibration goes to the document and to the device configuration (REST: the first snapshot after Start).
+// at Start the board calibration goes to the document and to the device configuration (REST: the first snapshot after Start).
 using System;
 using System.Globalization;
 using System.Linq;
@@ -24,7 +24,7 @@ namespace BecquerelMonitor
         // the answer to -cal: parsed and given to the document and the configuration (a seam for the tests: no session needed)
         internal void RefreshCalibrationFromAnswer(ResultData r, string answer)
         {
-            // gz-4/K4: the scale of the polynomial the TCP bridge reports at 4096/2048 channels is not established (ESP32 letter of 2026-10-21):
+            // the scale of the polynomial the TCP bridge reports at 4096/2048 channels is not established (not confirmed for the firmware):
             // at N other than 8192 the calibration is not taken - not into the document, not into the configuration, not to the file
             int n = r.DeviceConfig != null ? r.DeviceConfig.NumberOfChannels : (r.EnergySpectrum != null && r.EnergySpectrum.Spectrum != null ? r.EnergySpectrum.Spectrum.Length : AtomSpectraRestSpectrum.Channels);
             if (n != AtomSpectraRestSpectrum.Channels)

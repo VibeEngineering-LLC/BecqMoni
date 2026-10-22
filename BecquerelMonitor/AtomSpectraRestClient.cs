@@ -407,11 +407,11 @@ namespace BecquerelMonitor
         public int Status;
         public string Body;
         public int WireBytes;
-        public int BodyBytes;   // 2026-10-16: the decoded body; with ContentEncoding set, WireBytes is the compressed size on the network
+        public int BodyBytes;   // the decoded body; with ContentEncoding set, WireBytes is the compressed size on the network
         public string ContentEncoding;
         public long ElapsedMs;
         public string Error;
-        public bool BodyBroken;   // Zh3: the board answered (Status is kept) but the body was cut short or corrupt (gzip)
+        public bool BodyBroken;   // the board answered (Status is kept) but the body was cut short or corrupt (gzip)
 
         private static bool BodySaysRefused(string body)
         {
@@ -429,7 +429,7 @@ namespace BecquerelMonitor
         public bool SpectrometerDead;   // header X-Spectrometer-Dead: "1" (the board sends "0" or "1", fw spectrum_http_cache.c:279-280)
 
         // The request certainly never reached the board: the connection was refused or the name did not resolve.
-        // Only then may a POST be repeated without risk of doing the command twice (pass C 3).
+        // Only then may a POST be repeated without risk of doing the command twice.
         public bool NotSent;
 
         internal static bool IsNotSent(WebException ex)
@@ -474,14 +474,14 @@ namespace BecquerelMonitor
     {
         private readonly string _host;
         private readonly int _port;
-        private readonly string _baseUrl;   // scheme://host[:port][/prefix], no trailing slash (plan 2: the whole URL)
+        private readonly string _baseUrl;   // scheme://host[:port][/prefix], no trailing slash
         private string _csrfToken;
 
         public string Host { get { return _host; } }
         public int Port { get { return _port; } }
         public string BaseUrl { get { return _baseUrl; } }
 
-        public bool UseSystemProxy = true;                               // plan 2: system proxy, "do not use" switch
+        public bool UseSystemProxy = true;                               // system proxy, "do not use" switch
         public AtomSpectraRestAuth AuthKind = AtomSpectraRestAuth.None;  // for a proxy in front of the board
         public string AuthUser;
         public string AuthSecret;                                        // never written to the log
@@ -511,7 +511,7 @@ namespace BecquerelMonitor
             return Send("GET", path, null, false, deadlineMs);
         }
 
-        // F3: a repeated attempt of a poll goes over a connection of its own (own group, no keep-alive), so it never waits behind the
+        // a repeated attempt of a poll goes over a connection of its own (own group, no keep-alive), so it never waits behind the
         // aborted one on a pooled connection; the board serves one request at a time.
         public AtomSpectraRestResponse Get(string path, int deadlineMs, string connectionGroup)
         {
@@ -597,7 +597,7 @@ namespace BecquerelMonitor
                 req.Method = method;
                 req.Proxy = UseSystemProxy ? WebRequest.DefaultWebProxy : null;
                 // A POST gets its own connection: a pooled one the board has silently dropped would turn
-                // "not sent" into "sent, no answer" (pass C 3); polls keep the connection.
+                // "not sent" into "sent, no answer"; polls keep the connection.
                 req.KeepAlive = method != "POST";
                 if (connectionGroup != null)
                 {
@@ -613,13 +613,13 @@ namespace BecquerelMonitor
                 req.AllowAutoRedirect = false;
                 req.Timeout = deadlineMs;
                 req.ReadWriteTimeout = deadlineMs;
-                // 2026-10-16: gzip/deflate are decoded by hand after the read (Decode): the framework's AutomaticDecompression hid
+                // gzip/deflate are decoded by hand after the read (Decode): the framework's AutomaticDecompression hid
                 // Content-Encoding and the size on the wire, so the log always said "plain". fw feat/gzip-test compresses /api/spectrum.json.
                 req.AutomaticDecompression = DecompressionMethods.None;
 
                 if (SendAcceptEncoding)
                 {
-                    req.Headers[HttpRequestHeader.AcceptEncoding] = "gzip";   // Zh9: the board sends gzip only
+                    req.Headers[HttpRequestHeader.AcceptEncoding] = "gzip";   // the board sends gzip only
                 }
 
                 string auth = AuthorizationHeader();
@@ -682,13 +682,13 @@ namespace BecquerelMonitor
                             {
                                 byte[] buffer = new byte[4096];
                                 int bytesRead;
-                                string readProblem = null;   // Z1: a body that breaks off AFTER the status keeps the status
+                                string readProblem = null;   // a body that breaks off AFTER the status keeps the status
                                 try
                                 {
                                     while ((bytesRead = respStream.Read(buffer, 0, buffer.Length)) > 0)
                                     {
                                         ms.Write(buffer, 0, bytesRead);
-                                        if (ms.Length > MaxBodyBytes) break;   // Zh2: no more is read than the limit
+                                        if (ms.Length > MaxBodyBytes) break;   // no more is read than the limit
                                     }
                                 }
                                 catch (Exception ex)
@@ -699,7 +699,7 @@ namespace BecquerelMonitor
                                 {
                                     readProblem = "body cut short: " + ms.Length + " of " + resp.ContentLength + " B";   // closed early, no exception
                                 }
-                                // 2026-10-16: ms holds the bytes as they came over the network; gzip/deflate are decoded here
+                                // ms holds the bytes as they came over the network; gzip/deflate are decoded here
                                 result.WireBytes = (int)ms.Length;
                                 result.ContentEncoding = (resp.ContentEncoding ?? "").Trim().ToLowerInvariant();
                                 result.SpectrometerDead = (resp.Headers["X-Spectrometer-Dead"] ?? "").Trim() == "1";
@@ -708,13 +708,13 @@ namespace BecquerelMonitor
                                 if (readProblem != null) { problem = readProblem; broken = true; }
                                 result.BodyBytes = decoded.Length;
                                 result.Body = Encoding.UTF8.GetString(decoded);
-                                if (problem != null) { result.Error = problem; result.BodyBroken = broken; }   // Zh3: the status stays
+                                if (problem != null) { result.Error = problem; result.BodyBroken = broken; }   // the status stays
                             }
                         }
 
                         if (result.Status < 200 || result.Status >= 300)
                         {
-                            if (result.Error == null) result.Error = "HTTP " + result.Status;   // Z2: the reason of a broken body is not overwritten
+                            if (result.Error == null) result.Error = "HTTP " + result.Status;   // the reason of a broken body is not overwritten
                         }
                     }
                 }
@@ -729,7 +729,7 @@ namespace BecquerelMonitor
             }
             finally
             {
-                if (connectionGroup != null && method == "GET") CloseConnections(connectionGroup);   // E3
+                if (connectionGroup != null && method == "GET") CloseConnections(connectionGroup);
             }
 
             result.ElapsedMs = sw.ElapsedMilliseconds;
@@ -737,7 +737,7 @@ namespace BecquerelMonitor
             return result;
         }
 
-        // E2/E3: closes the connections of a group of this board ("" / null = the default group of the polls). A repeated attempt has a group
+        // closes the connections of a group of this board ("" / null = the default group of the polls). A repeated attempt has a group
         // of its own, closed after the attempt, so the groups do not pile up in the service point; the failed first attempt is closed
         // before the repeat, so the board never serves two connections of one poll.
         public void CloseConnections(string group)
@@ -752,7 +752,7 @@ namespace BecquerelMonitor
             }
         }
 
-        // Zh2: a body over this size (read from the wire or decoded) is refused; the spectrum of N=8192 is about 26 KB
+        // a body over this size (read from the wire or decoded) is refused; the spectrum of N=8192 is about 26 KB
         public const int MaxBodyBytes = 1 << 20;
 
         // gzip / deflate by Content-Encoding; anything else is returned as it came. problem != null: the body is not handed on;
@@ -793,7 +793,7 @@ namespace BecquerelMonitor
         // A gzip body cut short (the connection closed, or the board stopped writing) is not a whole answer: the framework's GZipStream
         // may hand back what it decoded without a word, so the trailer (RFC 1952: CRC32, then ISIZE = the length mod 2^32) is checked.
         // The error makes the attempt a failed one (the poll repeats it inside its period).
-        // CRC32 is checked by the framework's GZipStream itself (a wrong one throws InvalidDataException: test f5-gz-bad-crc, Zh1); one gzip member is
+        // CRC32 is checked by the framework's GZipStream itself (a wrong one throws InvalidDataException); one gzip member is
         // assumed (the board sends one): of several members the ISIZE of the last one would not match the whole output.
         private static void CheckGzipTrailer(byte[] wire, long decodedLength)
         {
@@ -817,7 +817,7 @@ namespace BecquerelMonitor
 
         private void LogRequest(string method, string path, bool withToken, AtomSpectraRestResponse result)
         {
-            // No secret goes to the log: neither the CSRF token nor the Authorization value (plan 5).
+            // No secret goes to the log: neither the CSRF token nor the Authorization value.
             string logLine = method + " " + BaseUrl + path +
                 (withToken ? " [CSRF]" : "") + (AuthKind != AtomSpectraRestAuth.None ? " [auth " + AuthKind + "]" : "") +
                 " -> " + (result.Status == 0 ? "no response" : result.Status.ToString()) +

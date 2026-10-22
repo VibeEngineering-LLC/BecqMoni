@@ -211,7 +211,7 @@ namespace BecquerelMonitor
         private volatile string lastError;
         private volatile string commandOnReconnect;
 
-        // Review fixes (2026-10-14): wake-up for an immediate reconnect, first-attempt signal (fail fast),
+        // Wake-up for an immediate reconnect, first-attempt signal (fail fast),
         // one-shot commands for the next connection, exit after the reconnect command (deferred -sto).
         private readonly AutoResetEvent wakeEvent = new AutoResetEvent(false);
         private readonly ManualResetEvent attemptEvent = new ManualResetEvent(false);
@@ -221,7 +221,7 @@ namespace BecquerelMonitor
 
         // A data event pairs a COMPLETE histogram cycle (all channels since the packet with offset 0) with a
         // status packet, in whichever order they arrive; both flags are cleared on every (re)connect, so a
-        // histogram from before a dropped link is never handed out as new (review A, F1).
+        // histogram from before a dropped link is never handed out as new.
         private readonly bool[] covered = new bool[HistogramSize];
         private int coveredCount;
         private bool histogramFresh;
@@ -234,7 +234,7 @@ namespace BecquerelMonitor
         // (e.g. a status left over from the cycle before a reconnect) and are not paired.
         public const int PairWindowMs = 400;
 
-        // Log window statistics, written every StatsEveryMs (operator 2026-10-14)
+        // Log window statistics, written every StatsEveryMs
         public const int StatsEveryMs = 5000;
         private readonly Stopwatch statsClock = Stopwatch.StartNew();
         private long statsAtMs;
@@ -708,7 +708,7 @@ namespace BecquerelMonitor
         }
 
         // a data event pairs a complete histogram cycle with a status packet in whichever order they arrive;
-        // a status packet alone only updates the counters (review A, F1).
+        // a status packet alone only updates the counters.
         private void TryRaiseDataReady()
         {
             if (!(histogramFresh && statusFresh)) return;

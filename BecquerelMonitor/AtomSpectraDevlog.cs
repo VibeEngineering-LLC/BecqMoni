@@ -36,7 +36,7 @@ namespace BecquerelMonitor
 
             double n = AtomSpectraJson.GetNumber(o, "next", -1);
             if (n > next) next = (long)n;
-            if (n >= 0 && n < since) next = (long)n;   // pass B P-6: the board restarted, its numbering began again
+            if (n >= 0 && n < since) next = (long)n;   // the board restarted, its numbering began again
 
             return sb.ToString();
         }

@@ -14,7 +14,7 @@ namespace BecquerelMonitor
         public bool SpectrometerSilent { get; private set; }
         public long HistOk { get; private set; }            // "hist_ok": monotonic until a reboot
         public double[] Calibration { get; private set; }   // "calib" (up to 5 slots) when "calib_set", else null
-        // F5 (plan K0-K4): fields of the v2 answer (the request carried ?channels=N)
+        // fields of the v2 answer (the request carried ?channels=N)
         public int Channels { get; set; } = -1;              // top-level "channels"; -1: absent (old firmware / v1 answer)
         public int CalibChannels { get; set; } = AtomSpectraRestSpectrum.Channels;   // "calib_channels": the scale of "calib"
         public AtomSpectraRestEpoch Epoch { get; set; }      // boot_id / dev_resets / spec_resets; null: none of them
@@ -44,7 +44,7 @@ namespace BecquerelMonitor
     {
         public const int Channels = 8192;   // the board's full scale; the only length of an answer without "channels"
 
-        // F5 (plan K1): the N the board folds to; a profile with another number of channels sends no parameter
+        // the N the board folds to; a profile with another number of channels sends no parameter
         public static readonly int[] RequestableChannels = { 8192, 4096, 2048, 1024 };
 
         public static int RequestChannels(int profileChannels)
@@ -73,7 +73,7 @@ namespace BecquerelMonitor
             return Parse(json, 0, out error);
         }
 
-        // F5 (plan K1): "channels", when present, must equal the bins; then the length must be the N asked for (8192 for a
+        // "channels", when present, must equal the bins; then the length must be the N asked for (8192 for a
         // request without the parameter). Without "channels" only the old 8192 answer is taken (the client folds it).
         public static string LengthError(int bins, int declared, int requested)
         {
@@ -222,7 +222,7 @@ namespace BecquerelMonitor
 
     public sealed class AtomSpectraRestAcquisition : IDisposable
     {
-        // gz-4/K1, gz-5/F-1: this many polls with a failing ANSWER of the board (503, a body that does not parse, 401) since the last good poll = the link
+        // this many polls with a failing ANSWER of the board (503, a body that does not parse, 401) since the last good poll = the link
         // is lost, whatever happened in between (the other way to lose it is silence, see LinkLostFloorMs); the polling goes on either way
         public const int LinkLostAfterFailures = 3;
         public static int LinkLostFloorMs = 15000;    // the least silence that is a lost link (a test lowers it to keep a short outage scenario)
@@ -231,9 +231,9 @@ namespace BecquerelMonitor
 
         private readonly AtomSpectraRestClient _client;
         private readonly int _periodMs;
-        private readonly int _requestChannels;              // F5 (plan K1): N of ?channels=N, 0 = no parameter
-        private readonly AtomSpectraRestPeriod _period;     // F5 (B6): the effective period
-        private long _lastAnsweredMs;                       // F5: clock time of the last answer (0 = the start of the clock)
+        private readonly int _requestChannels;              // N of ?channels=N, 0 = no parameter
+        private readonly AtomSpectraRestPeriod _period;     // the effective period
+        private long _lastAnsweredMs;                       // clock time of the last answer (0 = the start of the clock)
         private readonly ManualResetEvent _stopEvent = new ManualResetEvent(false);
         private Thread _thread;
         private readonly Stopwatch _clock = Stopwatch.StartNew();
@@ -241,8 +241,8 @@ namespace BecquerelMonitor
         private volatile bool _alive;
         private volatile bool _linkLost;
         private int _consecutiveFailures;
-        private int _answeredFailures;                      // gz-4/K1, gz-5/F-1: polls with a failing ANSWER of the board since the last good poll (silent polls neither add nor end the run)
-        private int _lastAnsweredStatus;                    // gz-5/R-1: the HTTP status of the last failing answer (0 after a good poll); 401/403 = a refusal of access
+        private int _answeredFailures;                      // polls with a failing ANSWER of the board since the last good poll (silent polls neither add nor end the run)
+        private int _lastAnsweredStatus;                    // the HTTP status of the last failing answer (0 after a good poll); 401/403 = a refusal of access
         private int _attempts;
         private int _successes;
         private int _failures;
@@ -282,7 +282,7 @@ namespace BecquerelMonitor
         {
             get
             {
-                // plan 3 / K5: max(2 s, period / 2) of the effective period (B6 lengthens both); at 1 s the poll may
+                // max(2 s, period / 2) of the effective period (the adaptive period lengthens both); at 1 s the poll may
                 // outlive the period, Run then skips ticks (no queue)
                 return Math.Max(MinDeadlineMs, _period.EffectiveMs / 2);
             }
@@ -296,7 +296,7 @@ namespace BecquerelMonitor
             get { return _linkLost; }
         }
 
-        // gz-5/R-1: the status of the last failing answer; a board that answers 401/403 is there but refuses access (a token), it is not lost
+        // the status of the last failing answer; a board that answers 401/403 is there but refuses access (a token), it is not lost
         public int LastAnsweredStatus { get { return Volatile.Read(ref _lastAnsweredStatus); } }
         public bool AccessDenied
         {
@@ -323,7 +323,7 @@ namespace BecquerelMonitor
         public AtomSpectraRestDataReadyArgs Last { get { return _last; } }
         public AtomSpectraRestBoardSample LastSample { get { return _lastSample; } }
         public long NowMs { get { return _clock.ElapsedMilliseconds; } }
-        // Age of the last answered poll, s (-1: none yet): "data is N s old" in the log window (plan M5).
+        // Age of the last answered poll, s (-1: none yet): "data is N s old" in the log window.
         public double DataAgeSeconds { get { AtomSpectraRestBoardSample l = _lastSample; return l == null ? -1 : (NowMs - l.AtMs) / 1000.0; } }
 
         public void Start()
@@ -344,7 +344,7 @@ namespace BecquerelMonitor
             _thread.Start();
         }
 
-        // Ask the poll thread to end after the request in flight, without waiting for it (pass B P-1).
+        // Ask the poll thread to end after the request in flight, without waiting for it.
         public void Signal()
         {
             _alive = false;
@@ -388,7 +388,7 @@ namespace BecquerelMonitor
                 string error;
                 AtomSpectraRestDataReadyArgs data;
                 int answeredStatus;
-                FetchWithRetry(out r, out data, out error, out answeredStatus);   // F3: a failed attempt is repeated inside the period (see there)
+                FetchWithRetry(out r, out data, out error, out answeredStatus);   // a failed attempt is repeated inside the period (see there)
                 _lastWireBytes = r.WireBytes;
                 _lastEncoding = r.ContentEncoding;
 
@@ -409,16 +409,16 @@ namespace BecquerelMonitor
                     int cf = Interlocked.Increment(ref _consecutiveFailures);
                     _lastError = error;
                     int periodInForce = _period.EffectiveMs;   // the period this poll was scheduled with, before the doubling below
-                    // F5 (B6): missed deadline, transport error or an answer that did not parse = a skipped poll: no Trip
+                    // missed deadline, transport error or an answer that did not parse = a skipped poll: no Trip
                     PeriodAfter(false);
 
                     AtomSpectraTcpLog.Warn("REST", "poll failed (" + cf + " in a row): " + error);
 
-                    // The link is lost by SILENCE (letter of Codeaudit 18.10): no answer for max(3 periods, 15 s); the period is the larger of
+                    // The link is lost by SILENCE: no answer for max(3 periods, 15 s); the period is the larger of
                     // the configured one and the one in force. The plain count of failures is not used: they come fast when a board refuses.
                     long silentMs = NowMs - Interlocked.Read(ref _lastAnsweredMs);
                     bool silent = silentMs >= Math.Max(3L * Math.Max(_periodMs, periodInForce), (long)LinkLostFloorMs);
-                    // gz-4/K1, gz-5/F-1: and by LinkLostAfterFailures polls in which the board ANSWERED with a failure, counted since the last good poll
+                    // and by LinkLostAfterFailures polls in which the board ANSWERED with a failure, counted since the last good poll
                     // (a board that answers 503 for ever is no link; a silent poll neither adds nor ends the run, so 503 and silence in turn count too)
                     int answeredInRow = answeredStatus > 0 ? Interlocked.Increment(ref _answeredFailures) : Volatile.Read(ref _answeredFailures);
                     if (answeredStatus > 0) Interlocked.Exchange(ref _lastAnsweredStatus, answeredStatus);
@@ -447,9 +447,9 @@ namespace BecquerelMonitor
             }
         }
 
-        // F3 (letter "pravilo-okna" item 2): a failed attempt is repeated INSIDE the period (see FetchWithRetry)
+        // a failed attempt is repeated INSIDE the period (see FetchWithRetry)
         public const int RetryPauseMs = 200;
-        // the attempt of one poll is max(MinDeadlineMs, 0.3 x period) = period * AttemptPermille / 1000 (Codeaudit 2026-10-18); the ONLY place of the 0.3
+        // the attempt of one poll is max(MinDeadlineMs, 0.3 x period) = period * AttemptPermille / 1000; the ONLY place of the 0.3
         public const int AttemptPermille = 300;
         public static int MaxAttempts = 3;   // attempts per period at most (a test sets 1 to feed one case per poll)
         private int _retries;
@@ -471,14 +471,14 @@ namespace BecquerelMonitor
         {
             if (r.Status == 404) return false;
             if (error == null) return false;
-            if (r.BodyBroken) return true;   // Zh3: a body cut short or corrupt (the status is the board's, it did answer)
+            if (r.BodyBroken) return true;   // a body cut short or corrupt (the status is the board's, it did answer)
             if (r.Status == 0) return !r.NotSent;   // a refused connect (NotSent) is not repeated: nothing listens, a pause of 0.2 s changes nothing
             return r.Ok && error.StartsWith("parse exception");
         }
 
         // An attempt lasts max(2 s, 0.3 x period); there are min(3, period / attempt) of them, at least one; the next one only if the time
         // spent + the pause + an attempt still fits the period. Each repeated attempt has a connection of its own.
-        // answeredStatus (gz-5/F-1): the HTTP status of the last attempt of THIS poll in which the board answered (0 = it answered in none); r is the LAST
+        // answeredStatus: the HTTP status of the last attempt of THIS poll in which the board answered (0 = it answered in none); r is the LAST
         // attempt, which may have got nothing although an earlier one did
         private void FetchWithRetry(out AtomSpectraRestResponse r, out AtomSpectraRestDataReadyArgs data, out string error, out int answeredStatus)
         {
@@ -490,23 +490,23 @@ namespace BecquerelMonitor
             for (int n = 1; ; n++)
             {
                 r = n == 1 ? _client.Get(SpectrumPath, attempts > 1 ? attemptMs : DeadlineMs) : _client.Get(SpectrumPath, attemptMs, "retry-" + Guid.NewGuid().ToString("N"));
-                // E4/Zh5: ANY HTTP answer of ANY attempt (401, 500, 503, a body that does not parse) is the board answering: the silence does not build up
+                // ANY HTTP answer of ANY attempt (401, 500, 503, a body that does not parse) is the board answering: the silence does not build up
                 if (r.Status > 0) MarkAnswered();
                 if (r.Status > 0) answeredStatus = r.Status;
                 Judge(r, out data, out error);
                 if (!Repeatable(r, error) || n >= attempts || spent.ElapsedMilliseconds + RetryPauseMs + attemptMs > period)
                 {
-                    if (error != null) { _client.CloseConnections(""); }   // Zh4: the connection of the LAST failed attempt is closed as well
+                    if (error != null) { _client.CloseConnections(""); }   // the connection of the LAST failed attempt is closed as well
                     return;
                 }
                 Interlocked.Increment(ref _retries);
-                _client.CloseConnections(null);   // E2: the connection of the failed attempt is closed before the repeat
+                _client.CloseConnections(null);   // the connection of the failed attempt is closed before the repeat
                 AtomSpectraTcpLog.Info("REST", "poll attempt " + n + " of " + attempts + " failed (" + error + "), repeated inside the period");
                 if (_stopEvent.WaitOne(RetryPauseMs)) return;
             }
         }
 
-        // F5 (B6): full = a snapshot taken; a 404 "No spectrum data yet" is neither (the period stays, plan K6)
+        // full = a snapshot taken; a 404 "No spectrum data yet" is neither (the period stays)
         private void PeriodAfter(bool full)
         {
             int before = _period.EffectiveMs;
@@ -524,7 +524,7 @@ namespace BecquerelMonitor
             Interlocked.Exchange(ref _lastAnsweredMs, NowMs);   // any answer of the board (503, a bad body too): the silence does not build up
         }
 
-        // gz-4/K1: only a GOOD poll (a snapshot or a 404 "no data yet") restores the link and ends the run of failures; a failing answer does not
+        // only a GOOD poll (a snapshot or a 404 "no data yet") restores the link and ends the run of failures; a failing answer does not
         private void MarkGood()
         {
             MarkAnswered();

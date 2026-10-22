@@ -83,7 +83,7 @@ namespace BecquerelMonitor
             levelBox.Items.Add(Resources.AtomSpectraTcpLogFilterAll);
             levelBox.Items.Add(Resources.AtomSpectraTcpLogFilterWarn);
             levelBox.Items.Add(Resources.AtomSpectraTcpLogFilterError);
-            levelBox.Items.Add(Resources.AtomSpectraTcpLogFilterDebug);   // 2026-10-16: device answers, hidden unless chosen
+            levelBox.Items.Add(Resources.AtomSpectraTcpLogFilterDebug);   // device answers, hidden unless chosen
             levelBox.SelectedIndex = 0;
             levelBox.SelectedIndexChanged += levelBox_SelectedIndexChanged;
 
@@ -153,7 +153,7 @@ namespace BecquerelMonitor
         private bool Passes(AtomSpectraTcpLogLine l)
         {
             int idx = levelBox.SelectedIndex;
-            if (idx == 3) return true;   // 2026-10-16: "all, with debug"
+            if (idx == 3) return true;   // "all, with debug"
             if (idx == 0) return l.Level != AtomSpectraTcpLogLevel.Debug;   // the default hides the Debug lines (-inf may carry the serial)
             if (idx == 1) return l.Level == AtomSpectraTcpLogLevel.Warn || l.Level == AtomSpectraTcpLogLevel.Error;
             if (idx == 2) return l.Level == AtomSpectraTcpLogLevel.Error;

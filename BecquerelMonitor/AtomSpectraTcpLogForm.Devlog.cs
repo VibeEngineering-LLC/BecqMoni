@@ -1,4 +1,4 @@
-// Plan 5 of the REST mode: the "Board log" tab reads GET /api/devlog?since=N of the board in use (AtomSpectraRestClient.Current) on a worker thread; the status line shows how old the board data is (plan M5).
+// REST mode: the "Board log" tab reads GET /api/devlog?since=N of the board in use (AtomSpectraRestClient.Current) on a worker thread; the status line shows how old the board data is.
 using BecquerelMonitor.Properties;
 using System;
 using System.Collections.Generic;

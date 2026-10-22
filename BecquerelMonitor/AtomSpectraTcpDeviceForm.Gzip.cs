@@ -1,4 +1,4 @@
-// 2026-10-16 (operator; ESP32 letters 20261016-ESP32-re-gzip-level-*): "Board reply compression" on the Device Specific page (REST).
+// "Board reply compression" on the Device Specific page (REST).
 // Shown after "Test connection (REST)" / "Refresh" (GET /api/boot-config gzip_level); written only by "Apply to board" after a confirmation.
 using BecquerelMonitor.Properties;
 using System;

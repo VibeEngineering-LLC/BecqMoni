@@ -2139,15 +2139,15 @@ namespace BecquerelMonitor
             {
                 // AtomSpectra TCP: read-only -cal on a worker thread (AtomSpectraTcpCalibrationReader).
                 DeviceConfigInfo asked = this.activeDeviceConfig;
-                int editedChannels = ChannelsBeingEdited(asked);   // gz-5/F-2: from the field, as at this click (not the saved profile)
+                int editedChannels = ChannelsBeingEdited(asked);   // from the field, as at this click (not the saved profile)
                 AtomSpectraTcpCalibrationReader.ReadIntoFormAsync((AtomSpectraTcpDeviceConfig)asked.InputDeviceConfig, this, this.button13,
                     () => ReferenceEquals(asked, this.activeDeviceConfig), () => (PolynomialEnergyCalibration)asked.EnergyCalibration,
                     new System.Windows.Forms.Control[] { this.numericUpDown7, this.numericUpDown2, this.numericUpDown1, this.numericUpDown9, this.numericUpDown8 },
-                    SetActiveDeviceConfigDirty, () => editedChannels);   // gz-4/K4, gz-5/F-2: the channels of the profile being edited
+                    SetActiveDeviceConfigDirty, () => editedChannels);   // the channels of the profile being edited
             }
         }
 
-        // gz-5/F-2: the number of channels in the field of the form (it reaches the profile only at "Save"); an unreadable field: the saved value
+        // the number of channels in the field of the form (it reaches the profile only at "Save"); an unreadable field: the saved value
         public int ChannelsEdited()   // for the AtomSpectra page (AtomSpectraTcpDeviceForm), which sits inside this form
         {
             return this.activeDeviceConfig == null ? 0 : ChannelsBeingEdited(this.activeDeviceConfig);
@@ -2519,7 +2519,7 @@ namespace BecquerelMonitor
             this.button6.Enabled = false;
         }
 
-        // 2026-10-16 (operator): the AtomSpectra TCP/REST device page puts the board calibration on the Energy Calibration page
+        // the AtomSpectra TCP/REST device page puts the board calibration on the Energy Calibration page
         // after its own "Test connection (REST)" / "Refresh" - the same fill as "Read from device" (button13), saved with the config.
         public void ApplyAtomSpectraCalibration(double[] coefficients)
         {

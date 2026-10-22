@@ -1,4 +1,4 @@
-// 2026-10-16 (operator screenshots 9.png): the page fills its tab, wide fields follow the width, long row labels wrap; proxy credentials warning.
+// the page fills its tab, wide fields follow the width, long row labels wrap; proxy credentials warning.
 using BecquerelMonitor.Properties;
 using System;
 using System.Drawing;
@@ -23,7 +23,7 @@ namespace BecquerelMonitor
             Dock = DockStyle.Fill;
 
             AddProxyAuthWarning();
-            AddGzipControls();   // 2026-10-16: "Board reply compression" (AtomSpectraTcpDeviceForm.Gzip.cs)
+            AddGzipControls();   // "Board reply compression" (AtomSpectraTcpDeviceForm.Gzip.cs)
 
             foreach (Label l in Controls.OfType<Label>().Where(x => x.AutoSize && x.Left < FieldColumn).ToList())
             {
@@ -75,7 +75,7 @@ namespace BecquerelMonitor
             }
         }
 
-        // operator 2026-10-16 — Basic and Bearer credentials go over plain HTTP; the warning sits under the password field
+        // Basic and Bearer credentials go over plain HTTP; the warning sits under the password field
         private void AddProxyAuthWarning()
         {
             int top = textAuthSecret.Bottom + 6;

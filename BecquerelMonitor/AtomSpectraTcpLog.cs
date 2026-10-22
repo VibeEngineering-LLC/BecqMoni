@@ -12,7 +12,7 @@ namespace BecquerelMonitor
         Info,
         Warn,
         Error,
-        Debug   // 2026-10-16 (operator): device answers (-inf may carry the serial); the log window hides it by default
+        Debug   // device answers (-inf may carry the serial); the log window hides it by default
     }
 
     public sealed class AtomSpectraTcpLogLine
@@ -68,7 +68,7 @@ namespace BecquerelMonitor
         public static event EventHandler<AtomSpectraTcpLogLine> LineAdded;
 
         // Status line of the log window: transport, host, link state (set by the device controller).
-        // Plan M5: age of the last board answer for "data is N s old" (REST session; null = none) and its threshold, s.
+        // Age of the last board answer for "data is N s old" (REST session; null = none) and its threshold, s.
         public static volatile Func<double> DataAgeSeconds;
         public static volatile int StaleAfterSeconds = 20;
 
@@ -76,7 +76,7 @@ namespace BecquerelMonitor
         public static string StatusText { get { return statusText; } }
         public static void SetStatus(string transport, string host, string state)
         {
-            // 2026-10-16 (11.png): the log window is shared; say that this is the LAST session's state and when it was set
+            // the log window is shared; say that this is the LAST session's state and when it was set
             statusText = "last session: " + (transport ?? "?") + "  |  " + (host ?? "") + "  |  " + (state ?? "") + "  |  " + DateTime.Now.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
         }
 
@@ -185,7 +185,7 @@ namespace BecquerelMonitor
                 return text;
             }
 
-            // CSRF tokens and passwords must not appear in the log (operator requirement)
+            // CSRF tokens and passwords must not appear in the log
             text = Regex.Replace(text, @"(X-CSRF-Token\s*[:=]\s*)\S+", "$1***", RegexOptions.IgnoreCase);
             text = Regex.Replace(text, @"""token""\s*:\s*""[^""]*""", "\"token\": \"***\"", RegexOptions.IgnoreCase);
             text = Regex.Replace(text, @"(token=)[^&\s]+", "$1***", RegexOptions.IgnoreCase);

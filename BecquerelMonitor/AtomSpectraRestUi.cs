@@ -1,4 +1,4 @@
-// windows of the REST transport (pass B N17, operator decision 9.1): the board is read on a worker thread behind a small modal wait window, so the UI thread never blocks on the network; the Start dialog and the Clear confirmation always run on the UI thread (marshalled when asked from a worker).
+// windows of the REST transport: the board is read on a worker thread behind a small modal wait window, so the UI thread never blocks on the network; the Start dialog and the Clear confirmation always run on the UI thread (marshalled when asked from a worker).
 using BecquerelMonitor.Properties;
 using System;
 using System.Drawing;
@@ -96,7 +96,7 @@ namespace BecquerelMonitor
                 text += Environment.NewLine + Environment.NewLine + Resources.AtomSpectraRestStartBehind;
 
             if (!string.IsNullOrEmpty(q.Note))
-                text += Environment.NewLine + Environment.NewLine + q.Note;   // 2026-10-16: TCP says what each button sends
+                text += Environment.NewLine + Environment.NewLine + q.Note;   // TCP says what each button sends
 
             return text;
         }
@@ -133,7 +133,7 @@ namespace BecquerelMonitor
                 restart.Size = new Size(170, 28);
                 restart.Text = Resources.AtomSpectraRestRestart;
                 restart.DialogResult = DialogResult.Retry;
-                restart.Enabled = q.DocumentSeconds <= 0 && q.DocumentCounts <= 0;   // pass A N2: only into an empty document
+                restart.Enabled = q.DocumentSeconds <= 0 && q.DocumentCounts <= 0;   // only into an empty document
                 f.Controls.Add(restart);
 
                 Button cancel = new Button();
@@ -143,7 +143,7 @@ namespace BecquerelMonitor
                 cancel.DialogResult = DialogResult.Cancel;
                 f.Controls.Add(cancel);
 
-                int extra = string.IsNullOrEmpty(q.Note) ? 0 : 100;   // 2026-10-16: room for the TCP note
+                int extra = string.IsNullOrEmpty(q.Note) ? 0 : 100;   // room for the TCP note
                 f.ClientSize = new Size(480, 190 + extra);
                 lbl.Height += extra;
                 foreach (Control b in new Control[] { cont, restart, cancel }) b.Top += extra;

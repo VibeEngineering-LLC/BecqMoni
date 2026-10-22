@@ -1,4 +1,4 @@
-// REST settings of the AtomSpectra device type (plan 2, operator: both transports stay "for tests" with a switch).
+// REST settings of the AtomSpectra device type (both transports stay "for tests" with a switch).
 // Controls are created in code, so the designer file stays as it was.
 // The REST test only READS (GET /api/status, GET /api/device).
 
@@ -135,7 +135,7 @@ namespace BecquerelMonitor
 
         private void LoadRest(AtomSpectraTcpDeviceConfig config)
         {
-            // plan 2: a new (empty) configuration starts with REST; an old file without the new fields loads as TCP bridge
+            // a new (empty) configuration starts with REST; an old file without the new fields loads as TCP bridge
             bool fresh = string.IsNullOrEmpty(config.Host) && string.IsNullOrEmpty(config.RestUrl);
             radioRest.Checked = config.Transport == AtomSpectraTransport.Rest || fresh;
             radioTcp.Checked = !radioRest.Checked;
@@ -213,7 +213,7 @@ namespace BecquerelMonitor
                 AtomSpectraTcpCalibrationResult calibration;
                 string bootConfig;
                 string text = RunRestTest(client, out calibration, out bootConfig);
-                AtomSpectraTcpLog.Info("Test", "Test connection (REST) " + client.BaseUrl + ": " + text);   // 2026-10-16: the result goes to the log too
+                AtomSpectraTcpLog.Info("Test", "Test connection (REST) " + client.BaseUrl + ": " + text);   // the result goes to the log too
                 ShowRestResult(generation, text, calibration, bootConfig);
             });
             worker.IsBackground = true;
@@ -221,7 +221,7 @@ namespace BecquerelMonitor
             worker.Start();
         }
 
-        // 2026-10-16: how a reply came over the network (operator: "and show the compression")
+        // how a reply came over the network (shows the compression)
         private static string CompressionText(AtomSpectraRestResponse r)
         {
             if (!r.Ok) return "";
@@ -232,8 +232,8 @@ namespace BecquerelMonitor
 
         private static string RunRestTest(AtomSpectraRestClient client, out AtomSpectraTcpCalibrationResult calibration, out string bootConfig)
         {
-            calibration = null;   // 2026-10-16: the GET /api/device answer also carries the calibration for the Energy Calibration page
-            bootConfig = null;    // 2026-10-16: GET /api/boot-config (gzip_level), read only
+            calibration = null;   // the GET /api/device answer also carries the calibration for the Energy Calibration page
+            bootConfig = null;    // GET /api/boot-config (gzip_level), read only
             AtomSpectraRestResponse st = client.Get("/api/status", 3000);
             if (!st.Ok)
             {
@@ -277,8 +277,8 @@ namespace BecquerelMonitor
                 {
                     if (generation != testGeneration || IsDisposed) return;
                     labelRestResult.Text = text;
-                    if (calibration != null) ApplyBoardCalibration(calibration);   // 2026-10-16: board calibration -> Energy Calibration page
-                    ShowBoardGzip(bootConfig);   // 2026-10-16: the board's reply compression level (null = not read)
+                    if (calibration != null) ApplyBoardCalibration(calibration);   // board calibration -> Energy Calibration page
+                    ShowBoardGzip(bootConfig);   // the board's reply compression level (null = not read)
                     buttonRestTest.Enabled = radioRest.Checked;
                 }));
             }

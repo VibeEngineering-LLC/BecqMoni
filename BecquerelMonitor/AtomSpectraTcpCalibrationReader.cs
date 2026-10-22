@@ -24,8 +24,8 @@ namespace BecquerelMonitor
         Malformed,
         BadCrc,
         EmptyCoefficients,
-        InvalidNumber,          // NaN or Infinity in a slot (review A, F2)
-        GapInCoefficients       // an empty slot followed by a filled one (review A, F3)
+        InvalidNumber,          // NaN or Infinity in a slot
+        GapInCoefficients       // an empty slot followed by a filled one
     }
 
     public sealed class AtomSpectraTcpCalibrationResult
@@ -391,7 +391,7 @@ namespace BecquerelMonitor
         internal static bool ApplyResult(AtomSpectraTcpCalibrationResult result, AtomSpectraTcpDeviceConfig config,
             Func<PolynomialEnergyCalibration> calibration, Control[] fieldsInOrder, Action markDirty, Func<int> channels)
         {
-            // gz-4/K4: the page edits the profile of N channels. REST: the board's 8192-channel polynomial folded to N (the same point as at Start);
+            // the page edits the profile of N channels. REST: the board's 8192-channel polynomial folded to N (the same point as at Start);
             // TCP: the scale of -cal at N other than 8192 is not established, so the button takes nothing (false = not taken, the caller says so)
             int n = channels == null ? 0 : channels();
             double[] coefficients = result.Coefficients;
@@ -404,7 +404,7 @@ namespace BecquerelMonitor
             return true;
         }
 
-        // 2026-10-16: the model AND the fields of the Energy Calibration page (SaveFormContents reads the fields back)
+        // the model AND the fields of the Energy Calibration page (SaveFormContents reads the fields back)
         public static void ApplyToFields(PolynomialEnergyCalibration target, double[] coefficients, Control[] fieldsInOrder)
         {
             foreach (Control field in fieldsInOrder) field.Text = "0";

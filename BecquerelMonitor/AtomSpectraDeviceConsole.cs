@@ -1,4 +1,4 @@
-// Settings console of the AtomSpectra network device type (operator 2026-10-16, after the COM type's "device features" tab):
+// Settings console of the AtomSpectra network device type (after the COM type's "device features" tab):
 // address host[:port], "Refresh" (name resolution + GET /api/device, only GET), and a command line.
 // REST: POST /api/command answers only {"ok":true|false} (fw web_server.c:322-342); the analyzer's text answer is taken from
 // the board log GET /api/devlog?since=N (fw usb_host_cdc.c: every CMD_TEXT packet, ring of 8 x 480 chars).
@@ -126,8 +126,8 @@ namespace BecquerelMonitor
             public string Host;
             public string Serial;
             public string Message;
-            public string DeviceJson;   // 2026-10-16: the GET /api/device body (calibration for the Energy Calibration page)
-            public string BootConfigJson;   // 2026-10-16: the GET /api/boot-config body (gzip_level), null when not read
+            public string DeviceJson;   // the GET /api/device body (calibration for the Energy Calibration page)
+            public string BootConfigJson;   // the GET /api/boot-config body (gzip_level), null when not read
         }
 
         public static RefreshResult Refresh(string name, int httpPort, bool useProxy, int timeoutMs)
@@ -192,7 +192,7 @@ namespace BecquerelMonitor
                                 Message = "found " + name + " -> " + a,
                                 DeviceJson = r.Body
                             };
-                            AtomSpectraRestResponse boot = client.Get("/api/boot-config", timeoutMs);   // 2026-10-16: read only (gzip_level)
+                            AtomSpectraRestResponse boot = client.Get("/api/boot-config", timeoutMs);   // read only (gzip_level)
                             res.BootConfigJson = boot.Ok ? boot.Body : null;
                             AtomSpectraTcpLog.Info("Refresh", res.Message);
                             return res;

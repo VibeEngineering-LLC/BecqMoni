@@ -1,4 +1,4 @@
-// Device features of the AtomSpectra network type (operator 2026-10-16, after the COM type AtomSpectraVCPDeviceForm, which
+// Device features of the AtomSpectra network type (after the COM type AtomSpectraVCPDeviceForm, which
 // is not changed): address host[:port] instead of COM port and baud rate, Refresh (name -> GET /api/device), status with the
 // serial number, and a command line with its output window. Logic is in AtomSpectraDeviceConsole (testable without WinForms).
 
@@ -68,7 +68,7 @@ namespace BecquerelMonitor
                 AutoSize = true,
                 Location = new Point(300, 404),
                 ForeColor = Color.Gray,
-                Text = Resources.AtomSpectraConsolePollTcpShort   // 2026-10-16 (13.png): the long hint was cut at the right edge
+                Text = Resources.AtomSpectraConsolePollTcpShort   // the long hint was cut at the right edge
             };
             Controls.Add(labelPollHint);
             new ToolTip().SetToolTip(labelPollHint, Resources.AtomSpectraConsolePollTcpHint);   // the full text on hover
@@ -166,7 +166,7 @@ namespace BecquerelMonitor
             buttonRefresh.Enabled = true;
         }
 
-        // 2026-10-16: REST shows its own hint; the bridge port test (TCP) is disabled there and says why. TCP keeps the old ones.
+        // REST shows its own hint; the bridge port test (TCP) is disabled there and says why. TCP keeps the old ones.
         private void ApplyModeTexts()
         {
             bool rest = radioRest.Checked;
@@ -211,8 +211,8 @@ namespace BecquerelMonitor
                         textAddress.Text = AtomSpectraDeviceConsole.FormatAddress(r.Host, AddressPort(), AddressDefaultPort());
                         labelStatus.ForeColor = Color.Green;
                         labelStatus.Text = string.Format(CultureInfo.CurrentCulture, Resources.AtomSpectraConsoleStatusConnected, r.Serial, name + " -> " + r.Host);
-                        ApplyBoardCalibration(AtomSpectraRestCalibration.ParseDevice(r.DeviceJson));   // 2026-10-16: board calibration -> Energy Calibration page
-                        ShowBoardGzip(r.BootConfigJson);   // 2026-10-16: the board's reply compression level
+                        ApplyBoardCalibration(AtomSpectraRestCalibration.ParseDevice(r.DeviceJson));   // board calibration -> Energy Calibration page
+                        ShowBoardGzip(r.BootConfigJson);   // the board's reply compression level
                     }
                     else
                     {

@@ -32,19 +32,19 @@ namespace BecquerelMonitor
         StoppedAfterReconnect,
         Deferred,
         Detached,       // REST: joined or observe-only acquisition, -sto not sent, polling stopped
-        Unconfirmed     // REST: -sto reached the board but no clear answer came back; not repeated (pass C 3)
+        Unconfirmed     // REST: -sto reached the board but no clear answer came back; not repeated
     }
 
     public sealed class AtomSpectraTcpSession : IAtomSpectraSession
     {
-        // IAtomSpectraSession. 2026-10-16 (operator): "Continue" on a counting board joins it (no command); the stream carries
+        // IAtomSpectraSession. "Continue" on a counting board joins it (no command); the stream carries
         // the board's ACCUMULATED histogram and time (AtomSpectraTcpDeviceController.UpdateHistogram copies them), so joining is real.
         public string TransportName { get { return "TCP"; } }
         public bool JoinedRunning { get { return joinedRunning; } }
         public double ElapsedAtBeginSeconds { get { return elapsedAtBegin; } }
 
         // A Start into a new document on a board with data asks "Continue / Start over / Cancel" (the REST dialog);
-        // null = no window to ask (headless runs, the TCP suite): the REST rules without windows (gz-5/F-4): a counting board is joined
+        // null = no window to ask (headless runs, the TCP suite): the REST rules without windows: a counting board is joined
         // (nothing sent), a stopped board with data is refused (HeadlessAsk, nothing sent), an empty board gets -sta only; no reset without an answer.
         public Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice> Ask { get; set; }
         public const int ProbeMs = 2500;   // the bridge sends a status packet about once a second
@@ -247,7 +247,7 @@ namespace BecquerelMonitor
             }
 
             bool accepted = true;
-            AtomSpectraRestStartPlan plan = PlanTcpStart(newDocument);   // 2026-10-16: was "-sto, -rst for every new document"
+            AtomSpectraRestStartPlan plan = PlanTcpStart(newDocument);   // was "-sto, -rst for every new document"
             if (plan == AtomSpectraRestStartPlan.Cancel)
             {
                 Close();
@@ -255,7 +255,7 @@ namespace BecquerelMonitor
             }
             if (plan == AtomSpectraRestStartPlan.Ask)
             {
-                // gz-5/F-4 (operator 2026-10-22, "as on REST"): no window to ask in and the board is stopped with data: refused, nothing is sent to it
+                // no window to ask in and the board is stopped with data: refused, nothing is sent to it
                 lastError = AtomSpectraRestSession.HeadlessAskText;
                 AtomSpectraTcpLog.Warn("Session", "TCP Start refused: " + lastError);
                 Close();
@@ -282,7 +282,7 @@ namespace BecquerelMonitor
 
             // never -rst on an automatic reconnect
             acquisition.CommandOnReconnect = "-sta";
-            if (plan == AtomSpectraRestStartPlan.Join) acquisition.CommandOnReconnect = null;   // 2026-10-16: a joined acquisition is not touched on reconnect either
+            if (plan == AtomSpectraRestStartPlan.Join) acquisition.CommandOnReconnect = null;   // a joined acquisition is not touched on reconnect either
             return AtomSpectraTcpBeginOutcome.Started;
         }
 
@@ -308,14 +308,14 @@ namespace BecquerelMonitor
             lock (samples) return samples.ToArray();
         }
 
-        // 2026-10-16 (operator): the REST rules (AtomSpectraRestPolicy) on what the board's own stream says before any command.
+        // the REST rules (AtomSpectraRestPolicy) on what the board's own stream says before any command.
         private AtomSpectraRestStartPlan PlanTcpStart(bool newDocument)
         {
             joinedRunning = false;
             elapsedAtBegin = 0;
             if (resetOnNextStart) return AtomSpectraRestStartPlan.Restart;   // an explicit Clear waits for this Start
             if (!newDocument) return AtomSpectraRestStartPlan.StartNew;       // the same document goes on: -sta, as before
-            AtomSpectraRestBoardSample[] s = ProbeBoard(ProbeMs);   // gz-5/F-4: with or without a window; no question possible = the REST rules without windows
+            AtomSpectraRestBoardSample[] s = ProbeBoard(ProbeMs);   // with or without a window; no question possible = the REST rules without windows
             bool counting = s.Length >= 2 ? s[s.Length - 1].Time > s[0].Time : s.Length == 1;   // one sample: unknown, ask
             AtomSpectraRestBoardSample board = s.Length > 0 ? s[s.Length - 1] : AtomSpectraRestBoardSample.NoData(0);
             AtomSpectraRestStartPlan plan = AtomSpectraRestPolicy.PlanStart(false, Ask != null, counting, board, 0, 0);
@@ -336,7 +336,7 @@ namespace BecquerelMonitor
 
             if (joinedRunning)
             {
-                // 2026-10-16 (operator): a joined acquisition is not ours to stop (as REST): no -sto, the board keeps counting
+                // a joined acquisition is not ours to stop (as REST): no -sto, the board keeps counting
                 AtomSpectraTcpLog.Info("Session", "Stop of a joined acquisition on " + host + ":" + port + ": detached, -sto not sent");
                 Close();
                 return AtomSpectraTcpStopOutcome.Detached;
@@ -408,7 +408,7 @@ namespace BecquerelMonitor
             acquisition.SendCommand(command);
             string answer = acquisition.GetCommandOutput(timeoutMs);
             AtomSpectraTcpLog.Info("TCP", "sent " + command + ": " + (answer == null ? "no answer" : answer.Length + " chars"));
-            if (answer != null)   // 2026-10-16 (operator): the text itself only at Debug (hidden by default): -inf may carry the serial
+            if (answer != null)   // the text itself only at Debug (hidden by default): -inf may carry the serial
                 AtomSpectraTcpLog.Debug("TCP", "answer to " + command + ": " + answer.Trim().Replace("\r\n", " | ").Replace("\n", " | ").Replace("\r", " | "));
             return answer;
         }

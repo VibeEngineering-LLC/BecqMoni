@@ -59,7 +59,7 @@ namespace BecquerelMonitor
             try
             {
                 IAtomSpectraSession s0 = session;
-                // pass B P-1: REST Stop behind the wait window, the UI thread does not block on the network
+                // REST Stop behind the wait window, the UI thread does not block on the network
                 AtomSpectraTcpStopOutcome outcome = s0 == null ? AtomSpectraTcpStopOutcome.NotRunning
                     : s0 is AtomSpectraRestSession ? AtomSpectraRestUi.RunWithWait(delegate { return s0.Stop(CommandTimeoutMs); })
                     : s0.Stop(CommandTimeoutMs);
@@ -249,7 +249,7 @@ namespace BecquerelMonitor
             OpenSession(config);
             linkLossReported = false;
 
-            // 2026-10-16 (operator, 13.png): a Start on a board with data asks "Continue / Start over / Cancel" (the REST dialog)
+            // a Start on a board with data asks "Continue / Start over / Cancel" (the REST dialog)
             AtomSpectraTcpSession tcp = session as AtomSpectraTcpSession;
             if (tcp != null) tcp.Ask = AppUi.HasWindows ? new Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice>(q => { q.Note = Resources.AtomSpectraTcpStartNote; return AtomSpectraRestUi.AskStart(q); }) : null;
             bool newDoc = start && newDocumentCreated;
@@ -265,7 +265,7 @@ namespace BecquerelMonitor
             {
                 if (newDocumentCreated)
                 {
-                    // Joining or resuming the board's acquisition (2026-10-16): the document starts when the board started.
+                    // Joining or resuming the board's acquisition: the document starts when the board started.
                     r.StartTime = DateTime.Now - TimeSpan.FromSeconds(session.ElapsedAtBeginSeconds);
                     newDocumentCreated = false;
                 }
@@ -279,7 +279,7 @@ namespace BecquerelMonitor
                 AtomSpectraTcpLog.SetStatus(session.TransportName, session.Host + ":" + session.Port, session.JoinedRunning ? "joined a running acquisition" : "measuring");
                 r.ResultDataStatus.Recording = true;
                 RefreshDeadTimeFromDevice(r);
-                RefreshCalibrationFromDevice(r);   // 2026-10-16 (operator): the board calibration -> document and configuration
+                RefreshCalibrationFromDevice(r);   // the board calibration -> document and configuration
                 return true;
             }
 
@@ -298,7 +298,7 @@ namespace BecquerelMonitor
                     return Refuse(string.Format(CultureInfo.InvariantCulture, Resources.ERRAtomSpectraTcpConnect, config.Host, session.Port, session.LastError ?? ""));
                 case AtomSpectraTcpBeginOutcome.NoAnswer:
                     return Refuse(string.Format(CultureInfo.InvariantCulture, Resources.ERRAtomSpectraTcpNoAnswer, config.Host, session.Port));
-                case AtomSpectraTcpBeginOutcome.Refused:   // gz-5/F-4: no window to ask in, a stopped board with data
+                case AtomSpectraTcpBeginOutcome.Refused:   // no window to ask in, a stopped board with data
                     return Refuse(session.LastError ?? AtomSpectraRestSession.HeadlessAskText);
                 default:
                     return Refuse(string.Format(CultureInfo.InvariantCulture, Resources.ERRAtomSpectraTcpNoAnswer, config.Host, session.Port));
@@ -336,7 +336,7 @@ namespace BecquerelMonitor
                 channels = data.DeviceConfig != null ? data.DeviceConfig.NumberOfChannels : 0;
             }
 
-            AtomSpectraTcpDataReadyArgs args = BuildArgs(e, channels, restChannels);   // F5 fix: a static method, tested without a window
+            AtomSpectraTcpDataReadyArgs args = BuildArgs(e, channels, restChannels);   // a static method, tested without a window
             IAtomSpectraSession s = session;
             if (s != null)
             {
@@ -350,8 +350,8 @@ namespace BecquerelMonitor
         }
 
         // The snapshot for the document: folded to the profile's channels; a REST snapshot is folded to restChannels (fixed at Start,
-        // pass B N12: a config edit during the run does not apply) and keeps the board's own live time, hist_ok, "calib" and the scale
-        // of that "calib" (F5, plan K4: calib_channels).
+        // a config edit during the run does not apply) and keeps the board's own live time, hist_ok, "calib" and the scale
+        // of that "calib" (calib_channels).
         internal static AtomSpectraTcpDataReadyArgs BuildArgs(AtomSpectraTcpDataReadyArgs e, int channels, int restChannels)
         {
             AtomSpectraRestDataReadyArgs rest = e as AtomSpectraRestDataReadyArgs;
@@ -380,7 +380,7 @@ namespace BecquerelMonitor
 
             if (e.Histogram.Length != spectrum.Spectrum.Length && session is AtomSpectraRestSession)
             {
-                // REST: detach without -sto (pass B N12) - the board keeps counting, the document is not touched
+                // REST: detach without -sto - the board keeps counting, the document is not touched
                 session.Detach();
                 resultData.ResultDataStatus.Recording = false;
                 if (resultData.MeasurementController != null) resultData.MeasurementController.NotifyMeasurementStoppedByDevice();
@@ -390,7 +390,7 @@ namespace BecquerelMonitor
 
             if (e.Histogram.Length != spectrum.Spectrum.Length)
             {
-                // Stop first, then report (P267): a modal box first would let the next packet open another.
+                // Stop first, then report: a modal box first would let the next packet open another.
                 if (resultData.MeasurementController != null)
                 {
                     resultData.MeasurementController.StopRecording();
@@ -400,13 +400,13 @@ namespace BecquerelMonitor
                 return;
             }
 
-            // gz-4/K3: AFTER the length checks above - a snapshot that is refused must not have rewritten the calibration and the configuration file
+            // AFTER the length checks above - a snapshot that is refused must not have rewritten the calibration and the configuration file
             AtomSpectraRestDataReadyArgs restSnapshot = e as AtomSpectraRestDataReadyArgs;
             if (boardCalibrationPending && restSnapshot != null)
             {
-                // 2026-10-16 (operator): the board calibration of the first snapshot after Start -> the document and the configuration
+                // the board calibration of the first snapshot after Start -> the document and the configuration
                 boardCalibrationPending = false;
-                // F5 (plan K4): "calib" is for calib_channels; the document has e.Histogram.Length channels (board or client fold)
+                // "calib" is for calib_channels; the document has e.Histogram.Length channels (board or client fold)
                 double[] slots = AtomSpectraRestCalibration.ForChannels(restSnapshot.Calibration, restSnapshot.CalibChannels, e.Histogram.Length);
                 AtomSpectraTcpLog.Info("Cal", ApplyBoardCalibration(spectrum, resultData.DeviceConfig, slots, configSaver));
             }
@@ -495,7 +495,7 @@ namespace BecquerelMonitor
             AtomSpectraTcpLog.SetStatus(s.TransportName, s.Host + ":" + s.Port, "link lost, retrying");
             // The status bar shows "port lost" only for the COM type (MainForm); until that is extended,
             // the loss is announced once per measurement.
-            AtomSpectraRestSession rs = s as AtomSpectraRestSession;   // UI test 2026-10-16: REST showed the TCP bridge text
+            AtomSpectraRestSession rs = s as AtomSpectraRestSession;   // REST has its own text, not the TCP bridge one
             ReportLater(rs != null ? rs.LinkLostText()
                 : string.Format(CultureInfo.InvariantCulture, Resources.MSGAtomSpectraTcpLinkLost, s.Host, s.Port));
         }

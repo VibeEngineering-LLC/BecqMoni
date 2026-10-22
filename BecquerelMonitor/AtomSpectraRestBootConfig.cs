@@ -1,4 +1,4 @@
-// 2026-10-16 (operator; ESP32 letters 20261016-ESP32-re-gzip-level-otvety/utochneniya): the board's reply compression level.
+// the board's reply compression level.
 // Only fw feat/gzip-test (1.2.37-rc90 and later) shows gzip_level in GET /api/boot-config; release 1.2.37 accepts the POST with 200 {"ok":true}
 // and changes nothing, so nothing is written unless the field is there, and success is checked by reading the value back.
 using System;

@@ -21,13 +21,13 @@ namespace BecquerelMonitor
         private int restPollSeconds = DefaultRestPollSeconds;
         private int restLimitSeconds;
 
-        // Plan 2 (REST): the whole board URL (scheme, host, port, path prefix); empty = http://Host[:RestPort]/.
+        // REST: the whole board URL (scheme, host, port, path prefix); empty = http://Host[:RestPort]/.
         public string RestUrl { get; set; } = "";
-        // Plan M4: never send a POST (several observers of one board).
+        // Never send a POST (several observers of one board).
         public bool RestObserveOnly { get; set; }
         // Board-side limit for OUR new acquisition (-sta N), s; 0 = none. Never sent when joining.
         public int RestLimitSeconds { get { return restLimitSeconds; } set { restLimitSeconds = Math.Max(0, value); } }
-        // Plan 2: the system proxy is used unless this is set.
+        // The system proxy is used unless this is set.
         public bool RestNoProxy { get; set; }
         // Authorization for a proxy in front of the board; the secret is stored DPAPI-protected (CurrentUser).
         public AtomSpectraRestAuth RestAuthKind { get; set; }
@@ -58,7 +58,7 @@ namespace BecquerelMonitor
             }
         }
 
-        // Transport (operator 2026-10-14): TCP bridge (default, so old configs load as before) or the board's REST API.
+        // Transport: TCP bridge (default, so old configs load as before) or the board's REST API.
         public AtomSpectraTransport Transport { get { return transport; } set { transport = value; } }
         public int RestPort { get { return restPort; } set { restPort = Math.Max(1, Math.Min(65535, value)); } }
 

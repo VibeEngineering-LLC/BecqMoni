@@ -15,8 +15,8 @@ namespace BecquerelMonitor
         StartRefused,
         ObserveOnly,
         HeadlessBehind,
-        DocumentNotEmpty,   // pass A N2: "Start over" is refused in a document that holds data
-        HeadlessAsk         // gz-4/K2: a stopped board with data and no window to ask in: refused, no -sta
+        DocumentNotEmpty,   // "Start over" is refused in a document that holds data
+        HeadlessAsk         // a stopped board with data and no window to ask in: refused, no -sta
     }
 
     public sealed class AtomSpectraRestStartQuestion
@@ -26,11 +26,11 @@ namespace BecquerelMonitor
         public long DocumentSeconds;
         public long DocumentCounts;
         public bool ContinueAllowed;
-        public string Note;   // 2026-10-16: an extra line under the question (TCP: what each button sends)
+        public string Note;   // an extra line under the question (TCP: what each button sends)
     }
 
     // The AtomSpectra type over the board's REST API; the board counts by itself, BecqMoni polls GET /api/spectrum.json and mirrors it.
-    // Rules (operator 2026-10-14, plan v3): a Start on a board with data asks every time (Continue / Start over / Cancel);
+    // Rules: a Start on a board with data asks every time (Continue / Start over / Cancel);
     // "observe only" never sends a POST; there is NO deferred reset (a Clear resets now or never);
     // Stop sends -sto only for an acquisition this session started;
     // a board whose counters went down is never written over the document.
@@ -68,18 +68,18 @@ namespace BecquerelMonitor
         public Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice> Ask;
         public long DocumentSeconds;
         public long DocumentCounts;
-        public int RequestChannels;   // F5 (plan K1): channels of the profile at Start; ?channels=N only for 8192/4096/2048/1024
+        public int RequestChannels;   // channels of the profile at Start; ?channels=N only for 8192/4096/2048/1024
         private int epochChangesSeen;
 
-        // The message of a lost link for the user: REST keeps polling every period (plan M5), not the TCP bridge's 60 s reconnect.
-        // gz-5/R-1, R-2: English literals (no ru/en resource yet, a limit of gz-5)
+        // The message of a lost link for the user: REST keeps polling every period, not the TCP bridge's 60 s reconnect.
+        // English literals (no ru/en resource yet)
         public const string AccessDeniedFormat = "AtomSpectra REST: the board {0} answers, but refuses access (HTTP {1}). Check the authorization token in the device settings. The measurement is not stopped; BecqMoni keeps polling the board every {2} s.";
         public const string HeadlessAskText = "The board is stopped and holds a measurement, and a run without windows cannot ask what to do with it. Nothing was sent to the board.";
 
         public string LinkLostText()
         {
             AtomSpectraRestAcquisition a = acquisition;
-            if (a != null && a.AccessDenied)   // gz-5/R-1: 401/403 is a refusal of access, not a board that does not answer
+            if (a != null && a.AccessDenied)   // 401/403 is a refusal of access, not a board that does not answer
                 return string.Format(CultureInfo.CurrentCulture, AccessDeniedFormat, AtomSpectraTcpLog.Mask(client.BaseUrl), a.LastAnsweredStatus, periodSeconds);
             return string.Format(CultureInfo.CurrentCulture, BecquerelMonitor.Properties.Resources.MSGAtomSpectraRestLinkLost,
                 AtomSpectraTcpLog.Mask(client.BaseUrl), periodSeconds);
@@ -132,7 +132,7 @@ namespace BecquerelMonitor
         public int PresetAfterStart(int documentPreset)
         {
             long board = (long)elapsedAtBegin;
-            // pass A N3 (plan M3): our run with a configured limit is stopped by the board (-sta N), not by the document preset
+            // our run with a configured limit is stopped by the board (-sta N), not by the document preset
             if (startedByUs && limitSeconds > 0)
                 return (int)Math.Min(int.MaxValue / 2, board + limitSeconds + 2L * Math.Max(1, periodSeconds) + 5);
             return board > 0 ? AtomSpectraRestPolicy.PresetForContinue(documentPreset, board, limitSeconds) : documentPreset;
@@ -188,7 +188,7 @@ namespace BecquerelMonitor
             stallReported = false;
             noDataSince = -1;
             noDataReported = false;
-            // [deferred reset: none] - a failed Clear leaves nothing behind for this Start (pass B, N3)
+            // [deferred reset: none] - a failed Clear leaves nothing behind for this Start
 
             string err;
             AtomSpectraRestBoardSample first = ReadBoard(ProbeTimeoutMs, out err);
@@ -217,7 +217,7 @@ namespace BecquerelMonitor
 
             if (plan == AtomSpectraRestStartPlan.Ask && Ask == null)
             {
-                // gz-4/K2: nobody to ask (headless) and the board is stopped with data: no -sta, the Start is refused
+                // nobody to ask (headless) and the board is stopped with data: no -sta, the Start is refused
                 LastPlan = plan;
                 Failure = AtomSpectraRestFailure.HeadlessAsk;
                 lastError = "the board is stopped and holds a measurement; there is no window to ask what to do with it";
@@ -275,7 +275,7 @@ namespace BecquerelMonitor
 
                 case AtomSpectraRestStartPlan.Restart:
                     // [no deferred reset]
-                    // pass A N2: the reset would make the first new snapshot overwrite this document's own data
+                    // the reset would make the first new snapshot overwrite this document's own data
                     if (DocumentSeconds > 0 || DocumentCounts > 0)
                     {
                         Failure = AtomSpectraRestFailure.DocumentNotEmpty;
@@ -324,7 +324,7 @@ namespace BecquerelMonitor
             return AtomSpectraTcpBeginOutcome.Started;
         }
 
-        private AtomSpectraRestResponse lastCommand;   // the answer to the last Send (pass C 3: was the command delivered at all?)
+        private AtomSpectraRestResponse lastCommand;   // the answer to the last Send (was the command delivered at all?)
 
         private bool Send(string command, int timeoutMs)
         {
@@ -347,7 +347,7 @@ namespace BecquerelMonitor
             AtomSpectraRestBoardSample last = acquisition != null ? acquisition.LastSample : null;
             if (last == null) last = lastProbe;
 
-            DetachNoWait();   // pass B P-1: the caller (UI thread) does not wait for a poll hanging on the board
+            DetachNoWait();   // the caller (UI thread) does not wait for a poll hanging on the board
 
             if (observeOnly)
             {
@@ -367,7 +367,7 @@ namespace BecquerelMonitor
 
             if (Send("-sto", commandTimeoutMs)) return AtomSpectraTcpStopOutcome.Stopped;
 
-            // pass C 3: the board cache (2 s) hides a short stop, so a repeat is safe only for a -sto that certainly
+            // the board cache (2 s) hides a short stop, so a repeat is safe only for a -sto that certainly
             // never reached the board; one that got through (503, timeout after connect) is left to the user
             AtomSpectraRestResponse sr = lastCommand;
             if (sr != null && !sr.NotSent && !(sr.Ok && !sr.Accepted))
@@ -412,7 +412,7 @@ namespace BecquerelMonitor
                         AtomSpectraRestBoardSample now = ReadBoard(ProbeTimeoutMs, out e);
                         if (now == null) return;
 
-                        // pass B, N11: someone else restarted or reset the board since our Stop -> the deferred -sto is not ours any more
+                        // someone else restarted or reset the board since our Stop -> the deferred -sto is not ours any more
                         if (!now.HasData || now.Time < stopTime || now.HistOk < stopHist)
                         {
                             AtomSpectraTcpLog.Warn("Session", "deferred -sto cancelled: the board was reset or restarted since our Stop (time " + stopTime + " -> " + (now.HasData ? now.Time : 0) + " s)");
@@ -420,13 +420,13 @@ namespace BecquerelMonitor
                             return;
                         }
 
-                        // pass A N4: -sto only to a board that has been counting all along since our Stop; a board that
+                        // -sto only to a board that has been counting all along since our Stop; a board that
                         // stopped (our lost -sto did work) and maybe was resumed by someone else is left alone
                         long wall = watch.ElapsedMilliseconds;
                         if (first[0] < 0) { first[0] = now.Time; first[1] = wall; return; }
                         if (wall - first[1] < AtomSpectraRestPolicy.MinProbeGapMs) return;
                         // tolerance 3 s = board cache 2 s + rounding 1 s; a pause of the board longer than that (stopped and resumed
-                        // by someone else) cancels the repeat whenever the first look comes (pass C 3)
+                        // by someone else) cancels the repeat whenever the first look comes
                         bool counted = now.Time - first[0] + 2 >= (wall - first[1]) / 1000 && now.Time - stopTime + 3 >= wall / 1000;
                         if (!counted)
                         {
@@ -443,7 +443,7 @@ namespace BecquerelMonitor
                         }
                         else if (!r.NotSent && !r.Ok)
                         {
-                            // pass C 3: this one got through without a clear answer - never send a second one
+                            // this one got through without a clear answer - never send a second one
                             AtomSpectraTcpLog.Warn("Session", "deferred -sto reached the board, result unknown (" + (r.Error ?? r.Status.ToString()) + "); not repeated");
                             CancelStopRetryKey(key);
                         }
@@ -486,7 +486,7 @@ namespace BecquerelMonitor
                 return false;
             }
 
-            // P1-1: polling goes on while the request is in flight; a new epoch in that window is OUR reset's answer.
+            // Polling goes on while the request is in flight; a new epoch in that window is OUR reset's answer.
             // An unknown outcome (exception, lost answer) keeps the window to its term; only a certain "not done" withdraws it.
             AtomSpectraRestAcquisition running = acquisition;
             guard.ExpectOwnReset(running != null ? running.NowMs : -1);
@@ -494,7 +494,7 @@ namespace BecquerelMonitor
             if (r.Accepted && r.SentFalse)
             {
                 guard.CancelOwnReset();
-                // pass C 7: the board answered but the analyzer did not get -rst - the spectrum is not cleared
+                // the board answered but the analyzer did not get -rst - the spectrum is not cleared
                 lastError = "the board answered sent=false: the analyzer did not get the reset";
                 Failure = AtomSpectraRestFailure.ResetRefused;
                 AtomSpectraTcpLog.Warn("Session", "Clear: reset not done, sent=false (the analyzer did not get -rst)");
@@ -596,7 +596,7 @@ namespace BecquerelMonitor
             if (sample == null) return;
             if (sample.HasData)
             {
-                if (u == AtomSpectraRestUpdate.Apply) { noDataSince = -1; noDataReported = false; }   // D5: a snapshot that is not taken (Stale) is not data
+                if (u == AtomSpectraRestUpdate.Apply) { noDataSince = -1; noDataReported = false; }   // a snapshot that is not taken (Stale) is not data
                 return;
             }
             if (u != AtomSpectraRestUpdate.NoData) return;
@@ -616,7 +616,7 @@ namespace BecquerelMonitor
             NoDataSignal(u, e.Sample, running);
             if (guard.EpochChanges != epochChangesSeen)
             {
-                epochChangesSeen = guard.EpochChanges;   // F5 (plan K2): logged once per change
+                epochChangesSeen = guard.EpochChanges;   // logged once per change
                 AtomSpectraTcpLog.Info("Session", "board epoch changed (" + guard.LastEpochChange + "): the board was reset from outside");
             }
             if (u == AtomSpectraRestUpdate.Apply)
@@ -642,7 +642,7 @@ namespace BecquerelMonitor
             }
 
             AtomSpectraRestAcquisition acq = acquisition;
-            // finding 3: a 404 tells nothing about growth, and after skipped polls (doubled period) the last growth is long ago
+            // a 404 tells nothing about growth, and after skipped polls (doubled period) the last growth is long ago
             if (u != AtomSpectraRestUpdate.NoData && !stallReported && acq != null && guard.Stalled(acq.NowMs, StallMs))
             {
                 stallReported = true;

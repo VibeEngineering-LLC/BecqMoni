@@ -6,10 +6,9 @@ namespace BecquerelMonitor
 {
     public static class AtomSpectraRestCalibration
     {
-        // F5 (plan K4): channel k' of the folded spectrum sums fine channels m*k' .. m*k'+m-1 (the board and Compress alike);
+        // channel k' of the folded spectrum sums fine channels m*k' .. m*k'+m-1 (the board and Compress alike);
         // it is placed at the centre of its group, x = m*k' + GroupCentre(m).
-        // Assumption: the argument of the board's polynomial is the index of the channel centre (accepted by Codeaudit
-        // for K4, not confirmed by the board).
+        // Assumption: the argument of the board's polynomial is the index of the channel centre (not confirmed by the board).
         public static double GroupCentre(int m)
         {
             return (m - 1) / 2.0;
@@ -22,7 +21,7 @@ namespace BecquerelMonitor
             return r;
         }
 
-        // F5 (plan K4): "calib" is for calib_channels (8192 when the field is absent); for `channels` = calib_channels / m the
+        // "calib" is for calib_channels (8192 when the field is absent); for `channels` = calib_channels / m the
         // polynomial E(x), x = m*k' + s, is expanded in powers of k' (same degree): b_j = m^j * sum_i a_i C(i,j) s^(i-j).
         // m = 1: the slots unchanged. NaN (an empty slot) stays NaN. No whole m: null (the calibration is not taken).
         public static double[] ForChannels(double[] slots, int calibChannels, int channels)
@@ -81,7 +80,7 @@ namespace BecquerelMonitor
             return result;
         }
 
-        // 2026-10-16: the "calib" slots of a spectrum snapshot (null = calib_set false; NaN = an empty slot), the rules of ParseDevice
+        // the "calib" slots of a spectrum snapshot (null = calib_set false; NaN = an empty slot), the rules of ParseDevice
         public static AtomSpectraTcpCalibrationResult FromSlots(double[] slots)
         {
             if (slots == null)

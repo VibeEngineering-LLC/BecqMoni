@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace BecquerelMonitor
 {
-    // REST branch of the controller (plan v3, pass B): the board is the only source of truth;
+    // REST branch of the controller: the board is the only source of truth;
     // Start reads the board behind a wait window and asks when it holds data; joining never sends a command;
     // a board reset/restart from outside stops the recording without touching the document;
     // Clear resets the board only now, after a confirmation with the board's numbers.
@@ -21,7 +21,7 @@ namespace BecquerelMonitor
             string key = config.RestSessionKey();
             if (session is AtomSpectraRestSession && session.IsOpen && key != restKey)
             {
-                // pass A N6: a configuration saved during a run never drops the running session (its own -sto would be lost)
+                // a configuration saved during a run never drops the running session (its own -sto would be lost)
                 AtomSpectraTcpLog.Warn("Session", "REST settings changed during a run: they apply after Stop");
                 return;
             }
@@ -78,25 +78,25 @@ namespace BecquerelMonitor
                     linkLossReported = false;
                     rest.DocumentSeconds = (long)r.ResultDataStatus.ElapsedTime.TotalSeconds;
                     rest.DocumentCounts = r.EnergySpectrum != null ? r.EnergySpectrum.ValidPulseCount : 0;
-                    // operator 9.1: asked on the UI thread; a headless run never asks (joins or refuses)
+                    // asked on the UI thread; a headless run never asks (joins or refuses)
                     rest.Ask = AppUi.HasWindows ? new Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice>(AtomSpectraRestUi.AskStart) : null;
-                    // F5 (plan K1): ?channels=N of the profile at Start (the same number restChannels keeps below)
+                    // ?channels=N of the profile at Start (the same number restChannels keeps below)
                     rest.RequestChannels = r.DeviceConfig != null ? r.DeviceConfig.NumberOfChannels : 0;
                     bool newDoc = newDocumentCreated;
                     AtomSpectraTcpBeginOutcome outcome = AtomSpectraRestUi.RunWithWait(delegate { return rest.Begin(newDoc, CommandTimeoutMs); });
                     if (outcome == AtomSpectraTcpBeginOutcome.Started)
                     {
-                        restChannels = r.DeviceConfig != null ? r.DeviceConfig.NumberOfChannels : 0;   // pass B N12: fixed at Start
+                        restChannels = r.DeviceConfig != null ? r.DeviceConfig.NumberOfChannels : 0;   // fixed at Start
                         long boardSeconds = (long)rest.ElapsedAtBeginSeconds;
-                        r.StartTime = DateTime.Now - TimeSpan.FromSeconds(boardSeconds);   // plan M1: the document starts when the board started
+                        r.StartTime = DateTime.Now - TimeSpan.FromSeconds(boardSeconds);   // the document starts when the board started
                         newDocumentCreated = false;
                         int before = r.ResultDataStatus.PresetTime;
-                        // pass B N5/N6, pass A N3: the preset must not stop the board before its own limit (MeasurementController.cs:749)
+                        // the preset must not stop the board before its own limit (MeasurementController.cs:749)
                         r.ResultDataStatus.PresetTime = rest.PresetAfterStart(before);
                         AtomSpectraTcpLog.Info("Session", "preset " + before + " s -> " + r.ResultDataStatus.PresetTime + " s (board time " + boardSeconds + " s)");
                         AtomSpectraTcpLog.SetStatus("REST", rest.Host + ":" + rest.Port, rest.ObserveOnly ? "observing" : (rest.JoinedRunning ? "joined a running acquisition" : "measuring"));
                         r.ResultDataStatus.Recording = true;
-                        boardCalibrationPending = true;   // 2026-10-16: the first snapshot's "calib" -> document and configuration
+                        boardCalibrationPending = true;   // the first snapshot's "calib" -> document and configuration
                         RefreshDeadTimeFromDevice(r);
                         return true;
                     }
@@ -109,7 +109,7 @@ namespace BecquerelMonitor
             }
             catch (Exception ex)
             {
-                // pass B N20: our own text, not the generic "Bluetooth not supported" of MeasurementController
+                // our own text, not the generic "Bluetooth not supported" of MeasurementController
                 AtomSpectraTcpLog.Error("Session", "Start failed: " + ex.GetType().Name + ": " + ex.Message);
                 refusal = string.Format(CultureInfo.CurrentCulture, Resources.ERRAtomSpectraRestStart, ex.Message);
             }
@@ -128,7 +128,7 @@ namespace BecquerelMonitor
                     return string.Format(CultureInfo.CurrentCulture, Resources.ERRAtomSpectraRestRestartPartial, rest.LastError ?? "");
                 case AtomSpectraRestFailure.HeadlessBehind:
                     return Resources.ERRAtomSpectraRestHeadlessBehind;
-                case AtomSpectraRestFailure.HeadlessAsk:   // gz-5/R-2: a stopped board with data and no window to ask in
+                case AtomSpectraRestFailure.HeadlessAsk:   // a stopped board with data and no window to ask in
                     return AtomSpectraRestSession.HeadlessAskText;
                 case AtomSpectraRestFailure.DocumentNotEmpty:
                     return Resources.ERRAtomSpectraRestNeedNewDocument;
