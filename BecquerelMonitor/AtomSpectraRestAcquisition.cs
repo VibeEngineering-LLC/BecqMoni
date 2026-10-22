@@ -222,8 +222,8 @@ namespace BecquerelMonitor
 
     public sealed class AtomSpectraRestAcquisition : IDisposable
     {
-        // gz-4/K1: this many failures IN A ROW, each of them an answer of the board (503, a body that does not parse), = the link is lost
-        // (the other way to lose it is silence, see LinkLostFloorMs); the polling goes on either way
+        // gz-4/K1, gz-5/F-1: this many polls with a failing ANSWER of the board (503, a body that does not parse, 401) since the last good poll = the link
+        // is lost, whatever happened in between (the other way to lose it is silence, see LinkLostFloorMs); the polling goes on either way
         public const int LinkLostAfterFailures = 3;
         public static int LinkLostFloorMs = 15000;    // the least silence that is a lost link (a test lowers it to keep a short outage scenario)
         public const int MinDeadlineMs = 2000;
@@ -241,7 +241,8 @@ namespace BecquerelMonitor
         private volatile bool _alive;
         private volatile bool _linkLost;
         private int _consecutiveFailures;
-        private int _answeredFailures;                      // gz-4/K1: failures in a row that were answers of the board (reset by a good poll or by silence)
+        private int _answeredFailures;                      // gz-4/K1, gz-5/F-1: polls with a failing ANSWER of the board since the last good poll (silent polls neither add nor end the run)
+        private int _lastAnsweredStatus;                    // gz-5/R-1: the HTTP status of the last failing answer (0 after a good poll); 401/403 = a refusal of access
         private int _attempts;
         private int _successes;
         private int _failures;
@@ -293,6 +294,13 @@ namespace BecquerelMonitor
         public bool IsLinkLost
         {
             get { return _linkLost; }
+        }
+
+        // gz-5/R-1: the status of the last failing answer; a board that answers 401/403 is there but refuses access (a token), it is not lost
+        public int LastAnsweredStatus { get { return Volatile.Read(ref _lastAnsweredStatus); } }
+        public bool AccessDenied
+        {
+            get { int s = LastAnsweredStatus; return s == 401 || s == 403; }
         }
 
         public bool IsRunning
@@ -379,7 +387,8 @@ namespace BecquerelMonitor
                 AtomSpectraRestResponse r;
                 string error;
                 AtomSpectraRestDataReadyArgs data;
-                FetchWithRetry(out r, out data, out error);   // F3: a failed attempt is repeated inside the period (see there)
+                int answeredStatus;
+                FetchWithRetry(out r, out data, out error, out answeredStatus);   // F3: a failed attempt is repeated inside the period (see there)
                 _lastWireBytes = r.WireBytes;
                 _lastEncoding = r.ContentEncoding;
 
@@ -405,12 +414,14 @@ namespace BecquerelMonitor
 
                     AtomSpectraTcpLog.Warn("REST", "poll failed (" + cf + " in a row): " + error);
 
-                    // The link is lost only by SILENCE (letter of Codeaudit 18.10): no answer for max(3 periods, 15 s); the period is the larger of
-                    // the configured one and the one in force. The count of failures in a row is not used: they come fast when a board refuses.
+                    // The link is lost by SILENCE (letter of Codeaudit 18.10): no answer for max(3 periods, 15 s); the period is the larger of
+                    // the configured one and the one in force. The plain count of failures is not used: they come fast when a board refuses.
                     long silentMs = NowMs - Interlocked.Read(ref _lastAnsweredMs);
                     bool silent = silentMs >= Math.Max(3L * Math.Max(_periodMs, periodInForce), (long)LinkLostFloorMs);
-                    // gz-4/K1: and by LinkLostAfterFailures failures in a row that were all ANSWERS (a board that answers 503 for ever is no link)
-                    int answeredInRow = r.Status > 0 ? Interlocked.Increment(ref _answeredFailures) : Interlocked.Exchange(ref _answeredFailures, 0);
+                    // gz-4/K1, gz-5/F-1: and by LinkLostAfterFailures polls in which the board ANSWERED with a failure, counted since the last good poll
+                    // (a board that answers 503 for ever is no link; a silent poll neither adds nor ends the run, so 503 and silence in turn count too)
+                    int answeredInRow = answeredStatus > 0 ? Interlocked.Increment(ref _answeredFailures) : Volatile.Read(ref _answeredFailures);
+                    if (answeredStatus > 0) Interlocked.Exchange(ref _lastAnsweredStatus, answeredStatus);
                     if ((silent || answeredInRow >= LinkLostAfterFailures) && !_linkLost)
                     {
                         _linkLost = true;
@@ -467,8 +478,11 @@ namespace BecquerelMonitor
 
         // An attempt lasts max(2 s, 0.3 x period); there are min(3, period / attempt) of them, at least one; the next one only if the time
         // spent + the pause + an attempt still fits the period. Each repeated attempt has a connection of its own.
-        private void FetchWithRetry(out AtomSpectraRestResponse r, out AtomSpectraRestDataReadyArgs data, out string error)
+        // answeredStatus (gz-5/F-1): the HTTP status of the last attempt of THIS poll in which the board answered (0 = it answered in none); r is the LAST
+        // attempt, which may have got nothing although an earlier one did
+        private void FetchWithRetry(out AtomSpectraRestResponse r, out AtomSpectraRestDataReadyArgs data, out string error, out int answeredStatus)
         {
+            answeredStatus = 0;
             int period = _period.EffectiveMs;
             int attemptMs = Math.Max(MinDeadlineMs, (int)((long)period * AttemptPermille / 1000));
             int attempts = Math.Max(1, Math.Min(MaxAttempts, period / attemptMs));
@@ -478,6 +492,7 @@ namespace BecquerelMonitor
                 r = n == 1 ? _client.Get(SpectrumPath, attempts > 1 ? attemptMs : DeadlineMs) : _client.Get(SpectrumPath, attemptMs, "retry-" + Guid.NewGuid().ToString("N"));
                 // E4/Zh5: ANY HTTP answer of ANY attempt (401, 500, 503, a body that does not parse) is the board answering: the silence does not build up
                 if (r.Status > 0) MarkAnswered();
+                if (r.Status > 0) answeredStatus = r.Status;
                 Judge(r, out data, out error);
                 if (!Repeatable(r, error) || n >= attempts || spent.ElapsedMilliseconds + RetryPauseMs + attemptMs > period)
                 {
@@ -514,6 +529,7 @@ namespace BecquerelMonitor
         {
             MarkAnswered();
             Interlocked.Exchange(ref _answeredFailures, 0);
+            Interlocked.Exchange(ref _lastAnsweredStatus, 0);
             if (_linkLost)
             {
                 _linkLost = false;

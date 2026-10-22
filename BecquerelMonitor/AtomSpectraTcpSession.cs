@@ -252,6 +252,14 @@ namespace BecquerelMonitor
                 Close();
                 return AtomSpectraTcpBeginOutcome.Cancelled;
             }
+            if (plan == AtomSpectraRestStartPlan.Ask)
+            {
+                // gz-5/F-4 (operator 2026-10-22, "as on REST"): no window to ask in and the board is stopped with data: refused, nothing is sent to it
+                lastError = AtomSpectraRestSession.HeadlessAskText;
+                AtomSpectraTcpLog.Warn("Session", "TCP Start refused: " + lastError);
+                Close();
+                return AtomSpectraTcpBeginOutcome.Refused;
+            }
             if (plan == AtomSpectraRestStartPlan.Restart)
             {
                 accepted = Command("-sto", commandTimeoutMs) & Command("-rst", commandTimeoutMs);
@@ -306,12 +314,11 @@ namespace BecquerelMonitor
             elapsedAtBegin = 0;
             if (resetOnNextStart) return AtomSpectraRestStartPlan.Restart;   // an explicit Clear waits for this Start
             if (!newDocument) return AtomSpectraRestStartPlan.StartNew;       // the same document goes on: -sta, as before
-            if (Ask == null) return AtomSpectraRestStartPlan.Restart;          // no question possible: the old way
-            AtomSpectraRestBoardSample[] s = ProbeBoard(ProbeMs);
+            AtomSpectraRestBoardSample[] s = ProbeBoard(ProbeMs);   // gz-5/F-4: with or without a window; no question possible = the REST rules without windows
             bool counting = s.Length >= 2 ? s[s.Length - 1].Time > s[0].Time : s.Length == 1;   // one sample: unknown, ask
             AtomSpectraRestBoardSample board = s.Length > 0 ? s[s.Length - 1] : AtomSpectraRestBoardSample.NoData(0);
-            AtomSpectraRestStartPlan plan = AtomSpectraRestPolicy.PlanStart(false, true, counting, board, 0, 0);
-            if (plan == AtomSpectraRestStartPlan.Ask)
+            AtomSpectraRestStartPlan plan = AtomSpectraRestPolicy.PlanStart(false, Ask != null, counting, board, 0, 0);
+            if (plan == AtomSpectraRestStartPlan.Ask && Ask != null)
                 plan = AtomSpectraRestPolicy.PlanChoice(Ask(new AtomSpectraRestStartQuestion { Counting = counting, Board = board, ContinueAllowed = true }), counting, true);
             if (plan == AtomSpectraRestStartPlan.Join) joinedRunning = true;
             if (plan == AtomSpectraRestStartPlan.Join || plan == AtomSpectraRestStartPlan.Resume) elapsedAtBegin = board.Time;

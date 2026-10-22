@@ -128,6 +128,8 @@ namespace BecquerelMonitor
                     return string.Format(CultureInfo.CurrentCulture, Resources.ERRAtomSpectraRestRestartPartial, rest.LastError ?? "");
                 case AtomSpectraRestFailure.HeadlessBehind:
                     return Resources.ERRAtomSpectraRestHeadlessBehind;
+                case AtomSpectraRestFailure.HeadlessAsk:   // gz-5/R-2: a stopped board with data and no window to ask in
+                    return AtomSpectraRestSession.HeadlessAskText;
                 case AtomSpectraRestFailure.DocumentNotEmpty:
                     return Resources.ERRAtomSpectraRestNeedNewDocument;
                 default:

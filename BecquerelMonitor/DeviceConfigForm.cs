@@ -2139,11 +2139,26 @@ namespace BecquerelMonitor
             {
                 // AtomSpectra TCP: read-only -cal on a worker thread (AtomSpectraTcpCalibrationReader).
                 DeviceConfigInfo asked = this.activeDeviceConfig;
+                int editedChannels = ChannelsBeingEdited(asked);   // gz-5/F-2: from the field, as at this click (not the saved profile)
                 AtomSpectraTcpCalibrationReader.ReadIntoFormAsync((AtomSpectraTcpDeviceConfig)asked.InputDeviceConfig, this, this.button13,
                     () => ReferenceEquals(asked, this.activeDeviceConfig), () => (PolynomialEnergyCalibration)asked.EnergyCalibration,
                     new System.Windows.Forms.Control[] { this.numericUpDown7, this.numericUpDown2, this.numericUpDown1, this.numericUpDown9, this.numericUpDown8 },
-                    SetActiveDeviceConfigDirty, () => asked.NumberOfChannels);   // gz-4/K4: the channels of the profile edited
+                    SetActiveDeviceConfigDirty, () => editedChannels);   // gz-4/K4, gz-5/F-2: the channels of the profile being edited
             }
+        }
+
+        // gz-5/F-2: the number of channels in the field of the form (it reaches the profile only at "Save"); an unreadable field: the saved value
+        public int ChannelsEdited()   // for the AtomSpectra page (AtomSpectraTcpDeviceForm), which sits inside this form
+        {
+            return this.activeDeviceConfig == null ? 0 : ChannelsBeingEdited(this.activeDeviceConfig);
+        }
+
+        int ChannelsBeingEdited(DeviceConfigInfo saved)
+        {
+            int n;
+            string text = (this.integerTextBox1.Text ?? "").Trim();
+            if (int.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out n) && n > 0) return n;
+            return saved.NumberOfChannels;
         }
 
         void button14_Click(object sender, EventArgs e)

@@ -72,8 +72,15 @@ namespace BecquerelMonitor
         private int epochChangesSeen;
 
         // The message of a lost link for the user: REST keeps polling every period (plan M5), not the TCP bridge's 60 s reconnect.
+        // gz-5/R-1, R-2: English literals (no ru/en resource yet, a limit of gz-5)
+        public const string AccessDeniedFormat = "AtomSpectra REST: the board {0} answers, but refuses access (HTTP {1}). Check the authorization token in the device settings. The measurement is not stopped; BecqMoni keeps polling the board every {2} s.";
+        public const string HeadlessAskText = "The board is stopped and holds a measurement, and a run without windows cannot ask what to do with it. Nothing was sent to the board.";
+
         public string LinkLostText()
         {
+            AtomSpectraRestAcquisition a = acquisition;
+            if (a != null && a.AccessDenied)   // gz-5/R-1: 401/403 is a refusal of access, not a board that does not answer
+                return string.Format(CultureInfo.CurrentCulture, AccessDeniedFormat, AtomSpectraTcpLog.Mask(client.BaseUrl), a.LastAnsweredStatus, periodSeconds);
             return string.Format(CultureInfo.CurrentCulture, BecquerelMonitor.Properties.Resources.MSGAtomSpectraRestLinkLost,
                 AtomSpectraTcpLog.Mask(client.BaseUrl), periodSeconds);
         }

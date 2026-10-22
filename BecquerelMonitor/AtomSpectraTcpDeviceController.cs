@@ -298,6 +298,8 @@ namespace BecquerelMonitor
                     return Refuse(string.Format(CultureInfo.InvariantCulture, Resources.ERRAtomSpectraTcpConnect, config.Host, session.Port, session.LastError ?? ""));
                 case AtomSpectraTcpBeginOutcome.NoAnswer:
                     return Refuse(string.Format(CultureInfo.InvariantCulture, Resources.ERRAtomSpectraTcpNoAnswer, config.Host, session.Port));
+                case AtomSpectraTcpBeginOutcome.Refused:   // gz-5/F-4: no window to ask in, a stopped board with data
+                    return Refuse(session.LastError ?? AtomSpectraRestSession.HeadlessAskText);
                 default:
                     return Refuse(string.Format(CultureInfo.InvariantCulture, Resources.ERRAtomSpectraTcpNoAnswer, config.Host, session.Port));
             }
@@ -411,7 +413,7 @@ namespace BecquerelMonitor
 
             Array.Copy(e.Histogram, spectrum.Spectrum, e.Histogram.Length);
 
-            long sum =e.Histogram.Sum(x => (long)x);
+            long sum = e.Histogram.Sum(x => (long)x);
             spectrum.TotalPulseCount = sum + e.InvalidPulses;
             spectrum.ValidPulseCount = sum;
             spectrum.ChannelPitch = 1;
