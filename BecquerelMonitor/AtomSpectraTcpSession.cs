@@ -44,7 +44,8 @@ namespace BecquerelMonitor
         public double ElapsedAtBeginSeconds { get { return elapsedAtBegin; } }
 
         // A Start into a new document on a board with data asks "Continue / Start over / Cancel" (the REST dialog);
-        // null = the old way (headless runs, the TCP suite): -sto, -rst, -sta.
+        // null = no window to ask (headless runs, the TCP suite): the REST rules without windows (gz-5/F-4): a counting board is joined
+        // (nothing sent), a stopped board with data is refused (HeadlessAsk, nothing sent), an empty board gets -sta only; no reset without an answer.
         public Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice> Ask { get; set; }
         public const int ProbeMs = 2500;   // the bridge sends a status packet about once a second
         bool joinedRunning;
