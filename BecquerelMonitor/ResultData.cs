@@ -359,6 +359,13 @@ namespace BecquerelMonitor
             }
         }
 
+        /// <summary>
+        /// Настройки серии измерений (#BM-12): хранятся в документе рядом с уставкой
+        /// <see cref="PresetTime"/>; null — серия не настраивалась. В файлы самой серии
+        /// не пишутся (<c>SeriesHost.SaveSpectrum</c> обнуляет).
+        /// </summary>
+        public SeriesSettings Series { get; set; }
+
         public int PresetTime
         {
             get
@@ -649,6 +656,7 @@ namespace BecquerelMonitor
                 StartTime = this.StartTime,
                 EndTime = this.EndTime,
                 PresetTime = this.PresetTime,
+                Series = this.Series != null ? this.Series.Clone() : null,
                 BackgroundEnergySpectrum = this.BackgroundEnergySpectrum != null ? this.BackgroundEnergySpectrum.Clone() : null,
                 BackgroundSpectrumFile = this.BackgroundSpectrumFile,
                 BackgroundSpectrumPathname = this.BackgroundSpectrumPathname,

@@ -290,6 +290,11 @@ namespace BecquerelMonitor
         // panel leaves the recording state (Start re-enabled, Stop disabled). Idempotent.
         public void NotifyMeasurementStoppedByDevice()
         {
+            // #BM-12: прибор оборвал набор сам — серия не продолжается молча.
+            if (this.Series != null)
+            {
+                this.Series.OnDeviceLost(SeriesText.DeviceLost);
+            }
             this.ReleaseDeviceLease();
             if (this.resultData != null && this.resultData.ResultDataStatus != null)
             {
@@ -300,6 +305,12 @@ namespace BecquerelMonitor
                 this.MeasurementTerminated(this, new EventArgs());
             }
         }
+
+        /// <summary>#BM-12: серия измерений этого спектра (создаётся на «Старт» при включённой «Серии»); null — нет.</summary>
+        public MeasurementSeries Series;
+
+        /// <summary>#BM-12: связка серии с документом и прибором.</summary>
+        internal SeriesHost SeriesHost;
 
         // Token: 0x14000019 RID: 25
         // (add) Token: 0x060006A0 RID: 1696 RVA: 0x00027F40 File Offset: 0x00026140
@@ -778,16 +789,28 @@ namespace BecquerelMonitor
                 }
                 this.StopRecording();
                 this.document.UpdateSpectrum = false;
-                if (this.saveOnMeasurementEnd)
+                // #BM-12: серия сама пишет спектр в файл и ведёт дальше; запись документа и звук — по концу всей серии.
+                if (this.Series != null && this.Series.IsActive)
                 {
-                    this.documentManager.SaveDocument(this.document);
+                    this.Series.OnSpectrumComplete();
+                    return;
                 }
-                GlobalConfigInfo globalConfig = GlobalConfigManager.GetInstance().GlobalConfig;
-                string measurementCompletion = globalConfig.SoundConfig.MeasurementCompletion;
-                if (measurementCompletion != null && measurementCompletion != "")
-                {
-                    MeasurementController.PlayCompletionSound(measurementCompletion);
-                }
+                this.RunEndOfMeasurementActions();
+            }
+        }
+
+        /// <summary>Запись документа (галка «сохранить по окончании») и звук конца набора; у серии — раз, по её концу.</summary>
+        internal void RunEndOfMeasurementActions()
+        {
+            if (this.saveOnMeasurementEnd)
+            {
+                this.documentManager.SaveDocument(this.document);
+            }
+            GlobalConfigInfo globalConfig = GlobalConfigManager.GetInstance().GlobalConfig;
+            string measurementCompletion = globalConfig.SoundConfig.MeasurementCompletion;
+            if (measurementCompletion != null && measurementCompletion != "")
+            {
+                MeasurementController.PlayCompletionSound(measurementCompletion);
             }
         }
 

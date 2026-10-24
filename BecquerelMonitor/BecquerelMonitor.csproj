@@ -441,6 +441,13 @@
     </Compile>
     <Compile Include="MeasurementConfig.cs" />
     <Compile Include="MeasurementController.cs" />
+    <Compile Include="MeasurementSeries.cs" />
+    <Compile Include="SeriesSettings.cs" />
+    <Compile Include="SeriesText.cs" />
+    <Compile Include="SeriesSettingsForm.cs" />
+    <Compile Include="SeriesHost.cs" />
+    <Compile Include="DCControlPanel.Series.cs" />
+    <Compile Include="MainForm.Series.cs" />
     <Compile Include="MeasurementLine.cs" />
     <Compile Include="MeasurementResult.cs" />
     <Compile Include="MeasurementResultCollection.cs" />

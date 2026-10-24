@@ -37,6 +37,7 @@ namespace BecquerelMonitor
         public DCControlPanel(MainForm mainForm)
         {
             this.InitializeComponent();
+            this.InitializeSeriesStrip();   // #BM-12: серия измерений, DCControlPanel.Series.cs
             this.mainForm = mainForm;
             this.startBtn.Enabled = true;
             this.stopBtn.Enabled = false;
@@ -120,7 +121,11 @@ namespace BecquerelMonitor
                 return;
             }
             resultDataStatus.PresetTime = this.PresetTime;
-            if (!replacing && (int)resultDataStatus.ElapsedTime.TotalSeconds >= this.PresetTime)
+            if (!this.SeriesBegin(activeDocument, activeResultData, resultDataStatus))   // #BM-12: серия (может поднять уставку первого спектра)
+            {
+                return;
+            }
+            if (!replacing && (int)resultDataStatus.ElapsedTime.TotalSeconds >= resultDataStatus.PresetTime)
             {
                 // (`AMBER241`(10), 20.10.2026) Отказ — словами. Прежде «Старт» здесь молча
                 // возвращался: время спектра уже не меньше лимита, мерить дальше нечего, а
@@ -135,7 +140,8 @@ namespace BecquerelMonitor
             activeResultData.Dirty = true;
             this.mainForm.setAutosaveToDocument(activeDocument);
             DCPulseView dcpulseView = this.mainForm.DCPulseView;
-            activeResultData.MeasurementController.StartRecording();
+            bool seriesStarted = activeResultData.MeasurementController.StartRecording();
+            this.SeriesAfterStart(activeResultData, seriesStarted);   // #BM-12: не стартовало — серия не начинается
             if (activeDocument.PulseDetector != null)
             {
                 activeDocument.PulseDetector.PulseView = dcpulseView.PulseView;
@@ -197,8 +203,14 @@ namespace BecquerelMonitor
                 return;
             }
             ResultData activeResultData = activeDocument.ActiveResultData;
+            bool seriesSave;   // #BM-12: серия — вопрос о неполном спектре / стоп в паузе
+            if (this.SeriesBeforeStop(activeDocument, activeResultData, manual, out seriesSave) == 2)
+            {
+                return;
+            }
             if (!activeResultData.ResultDataStatus.Recording)
             {
+                this.SeriesAfterStop(activeResultData, seriesSave);
                 return;
             }
             DeviceController device = activeResultData.MeasurementController.DeviceController;
@@ -213,6 +225,7 @@ namespace BecquerelMonitor
             {
                 return;   // the program began to close while that question was open (a modal loop): its forms are being torn down
             }
+            this.SeriesAfterStop(activeResultData, seriesSave);
             if (activeDocument.PulseDetector != null)
             {
                 activeDocument.PulseDetector.DoUpdatePulseView = false;
@@ -332,6 +345,7 @@ namespace BecquerelMonitor
             {
                 this.attachBtn.Visible = false;
             }
+            this.ShowSeriesStatus(activeDocument, activeResultData);   // #BM-12
             this.formUpdating = false;
         }
 

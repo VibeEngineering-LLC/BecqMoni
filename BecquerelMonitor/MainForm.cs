@@ -2512,6 +2512,11 @@ namespace BecquerelMonitor
                 return;
             }
             DocEnergySpectrum docEnergySpectrum = (DocEnergySpectrum)sender;
+            if (!this.ConfirmCloseDuringSeries(docEnergySpectrum))   // #BM-12: идёт серия — вопрос
+            {
+                e.Cancel = true;
+                return;
+            }
             if (e.CloseReason == CloseReason.MdiFormClosing)
             {
                 // ⛔ (`AMBER178`, 05.10.2026) Закрывается ПРОГРАММА: документы
