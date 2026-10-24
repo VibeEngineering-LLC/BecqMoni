@@ -93,14 +93,14 @@ namespace SeriesTestRun
         public MeasurementSeries Series;
     }
 
-    public static class Program
+    public static partial class Program
     {
-        static string P(string name)
+        internal static string P(string name)
         {
             return @"C:\s\" + name + ".xml";
         }
 
-        static SeriesPair MakeSeries(int count, int delay, bool clear, string prefix = "sp", bool noOverwrite = true, int preset = 600, FakeHost host = null)
+        internal static SeriesPair MakeSeries(int count, int delay, bool clear, string prefix = "sp", bool noOverwrite = true, int preset = 600, FakeHost host = null)
         {
             if (host == null) host = new FakeHost();
             var settings = new SeriesSettings
@@ -118,12 +118,12 @@ namespace SeriesTestRun
             return new SeriesPair { Host = host, Series = series };
         }
 
-        static void True(bool cond, string msg)
+        internal static void True(bool cond, string msg)
         {
             if (!cond) throw new Exception(msg);
         }
 
-        static void Eq<T>(T expected, T actual, string what)
+        internal static void Eq<T>(T expected, T actual, string what)
         {
             bool same;
             if (expected is System.Collections.Generic.IEnumerable<string> && actual is System.Collections.Generic.IEnumerable<string>)
@@ -140,13 +140,13 @@ namespace SeriesTestRun
             }
         }
 
-        static string Show(object o)
+        internal static string Show(object o)
         {
             var e = o as System.Collections.Generic.IEnumerable<string>;
             return e != null && !(o is string) ? "[" + string.Join(", ", e) + "]" : Convert.ToString(o);
         }
 
-        static void Contains(string haystack, string needle, string what)
+        internal static void Contains(string haystack, string needle, string what)
         {
             if (haystack == null || !haystack.Contains(needle))
             {
@@ -320,9 +320,10 @@ namespace SeriesTestRun
             pair2.Host.Free = 500000000;
             pair2.Series.Begin(0);
             pair2.Series.OnSpectrumComplete();
-            Eq(SeriesState.PausedError, pair2.Series.State, "State");
-            Contains(pair2.Series.LastError, "1 GB", "LastError");
-            True(!pair2.Host.Calls.Any(c => c.StartsWith("save:")), "no save");
+            // PLAN-becqmoni-series.md section 5 item 9: less than 1 GB free is a WARNING, the series goes on and the file is written
+            Eq(SeriesState.Acquiring, pair2.Series.State, "State with low disk");
+            True(pair2.Host.Calls.Any(c => c.StartsWith("save:")), "the spectrum is still saved");
+            Contains(pair2.Series.Warning, "1 GB", "Warning");
 
             var pair3 = MakeSeries(0, 0, true);
             pair3.Host.Free = -1;
@@ -440,7 +441,7 @@ namespace SeriesTestRun
                 ("T12_Names_follow_index", T12_Names_follow_index),
                 ("T13_Delay_countdown", T13_Delay_countdown),
                 ("T14_ClearFailure", T14_ClearFailure)
-            };
+            }.Concat(ExtraTests()).ToArray();
 
             int pass = 0;
             int fail = 0;

@@ -5,8 +5,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 PROD = os.path.join(REPO, "BecquerelMonitor")
 PROD_FILES = ["SeriesSettings.cs", "MeasurementSeries.cs"]
-TEST_FILE = os.path.join(HERE, "SeriesTests.cs")
-MUTATIONS_FILE = os.path.join(HERE, "mutations.json")
+import glob
+TEST_FILES = sorted(glob.glob(os.path.join(HERE, "SeriesTests*.cs")))
+MUTATIONS_FILE = os.path.join(HERE, sys.argv[sys.argv.index("--file") + 1] if "--file" in sys.argv else "mutations.json")
 
 def find_csc():
     if os.environ.get("SERIES_CSC"):
@@ -62,7 +63,7 @@ def do_baseline():
     tmp = tempfile.mkdtemp()
     try:
         exe = os.path.join(tmp, "test.exe")
-        sources = [os.path.join(PROD, f) for f in PROD_FILES] + [TEST_FILE]
+        sources = [os.path.join(PROD, f) for f in PROD_FILES] + TEST_FILES
         ok, text = compile(sources, exe)
         if not ok:
             print(text)
@@ -101,7 +102,7 @@ def main():
                 with open(dst_path, "w", encoding="utf-8") as f:
                     f.write(patched)
                 other = [f for f in PROD_FILES if f != fname]
-                sources = [os.path.join(tmp, fname)] + [os.path.join(PROD, f) for f in other] + [TEST_FILE]
+                sources = [os.path.join(tmp, fname)] + [os.path.join(PROD, f) for f in other] + TEST_FILES
                 exe = os.path.join(tmp, "test.exe")
                 ok, text = compile(sources, exe)
                 if not ok:
