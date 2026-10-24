@@ -238,6 +238,21 @@ namespace BecquerelMonitor
             }
         }
 
+        /// <summary>
+        /// Does the name template tell the spectra of the series apart? 0 = yes (or one spectrum only); 1 = no, but a taken name
+        /// gets a suffix _1, _2 (warning); 2 = no and files are overwritten: every spectrum would replace the previous one (refusal).
+        /// Only {n}, {n:00} and {time} differ between spectra; {prefix} and {date} do not.
+        /// </summary>
+        public static int TemplateProblem(string template, int count, bool noOverwrite)
+        {
+            if (count == 1)
+            {
+                return 0;
+            }
+            bool tells = template != null && Regex.IsMatch(template, @"\{(n|n:[^}]*|time)\}", RegexOptions.IgnoreCase);
+            return tells ? 0 : (noOverwrite ? 1 : 2);
+        }
+
         private static bool IsReservedDeviceName(string stem)
         {
             string s = stem.ToUpperInvariant();

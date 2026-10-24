@@ -186,7 +186,7 @@ namespace SeriesTestRun
 
             host.Free = -1;
             series.OnSpectrumComplete();
-            Eq("", series.Warning, "Warning cleared when free space unknown");
+            Eq(MeasurementSeries.WarnDiskUnknown, series.Warning, "unknown free space (-1) is a warning, not silence");
 
             var pair2 = MakeSeries(3, 0, false);
             var series2 = pair2.Series;

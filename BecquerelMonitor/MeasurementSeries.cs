@@ -103,6 +103,20 @@ namespace BecquerelMonitor
         /// <summary>Number of the current acquisition run: grows with every NEW spectrum (Begin, successful start of k+1). A question asked about an older run is stale.</summary>
         public int AcquisitionId { get; private set; }
 
+        /// <summary>Warning: less than 1 GB is free on the disk of the series folder.</summary>
+        public const string WarnLowDisk = "Less than 1 GB free on the disk of the series folder";
+
+        /// <summary>Warning: the free space of the disk of the series folder is unknown (the series goes on).</summary>
+        public const string WarnDiskUnknown = "Free space on the disk of the series folder is unknown";
+
+        private bool _partialPending;
+
+        /// <summary>True when the device was lost during an acquisition: the incomplete spectrum k is still in the document and may be saved by <see cref="SavePartialAfterLoss"/>.</summary>
+        public bool PartialPending
+        {
+            get { return _partialPending && _state == SeriesState.PausedError; }
+        }
+
         /// <summary>Warning text for the status line ("" = none); a warning does not stop the series.</summary>
         public string Warning { get; private set; } = string.Empty;
 
@@ -171,10 +185,14 @@ namespace BecquerelMonitor
             if (Settings.Count == 0)
             {
                 long free = _host.FreeDiskBytes(Settings.Folder);
-                if (free >= 0 && free < 1073741824L)
+                if (free < 0)
+                {
+                    Warning = WarnDiskUnknown;   // the free space cannot be read (network folder, error): a WARNING, the series goes on
+                }
+                else if (free < 1073741824L)
                 {
                     // PLAN-becqmoni-series.md section 5 item 9: a WARNING, the series goes on (a real failure to write stops it below)
-                    Warning = "Less than 1 GB free on the disk of the series folder";
+                    Warning = WarnLowDisk;
                 }
                 else
                 {
@@ -281,9 +299,40 @@ namespace BecquerelMonitor
 
         public void OnDeviceLost(string reason)
         {
-            if (_state == SeriesState.Acquiring || _state == SeriesState.Delay || _state == SeriesState.Clearing)
+            if (_state != SeriesState.Acquiring && _state != SeriesState.Delay && _state != SeriesState.Clearing)
             {
-                Fail(reason);
+                return;   // Waiting, Saving, Idle, Done, PausedError: nothing to lose
+            }
+            bool partial = _state == SeriesState.Acquiring;
+            Fail(reason);
+            _partialPending = partial;
+        }
+
+        /// <summary>
+        /// Saves the incomplete spectrum that was pending when the device was lost.
+        /// </summary>
+        /// <param name="error">Receives an error message if the save operation fails.</param>
+        /// <returns>True if the spectrum was saved successfully; false if nothing was pending or the write failed.</returns>
+        public bool SavePartialAfterLoss(out string error)
+        {
+            error = string.Empty;
+            if (!PartialPending)
+                return false;
+
+            try
+            {
+                string path = SeriesSettings.BuildPath(Settings.Folder, Settings.Template, Settings.Prefix, Index, _host.Now, _host.FileExists, Settings.NoOverwrite);
+                if (!_host.SaveSpectrum(path, out error))
+                    return false;
+
+                _files.Add(path);
+                _partialPending = false;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
             }
         }
 
@@ -315,6 +364,7 @@ namespace BecquerelMonitor
 
         private void Fail(string message)
         {
+            _partialPending = false;   // set again by OnDeviceLost after Fail, only for an acquisition cut short
             LastError = message;
             State = SeriesState.PausedError;
         }
