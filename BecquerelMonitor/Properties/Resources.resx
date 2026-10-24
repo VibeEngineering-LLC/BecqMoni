@@ -44491,6 +44491,9 @@ The setting is saved on the board and applies to all its clients. If other progr
   <data name="AtomSpectraRestTestResult" xml:space="preserve">
     <value>{0}: firmware {1}, board time {2} s, total {3}; calibration {4}.</value>
   </data>
+  <data name="AtomSpectraFirmwareBelow" xml:space="preserve">
+    <value>AtomSpectra board firmware {0} is older than the recommended {1}: the board search and "Start" may not work - update the board firmware.</value>
+  </data>
   <data name="AtomSpectraRestCalibSet" xml:space="preserve">
     <value>set on the board</value>
   </data>
