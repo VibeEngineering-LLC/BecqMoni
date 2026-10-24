@@ -417,6 +417,21 @@ namespace BecquerelMonitor
         }
 
         /// <summary>
+        /// Вопрос «да / нет / отмена» (#BM-12: «Остановить серию — сохранить неполный спектр?»). Без окон
+        /// — бросок первым оператором, как у <c>AskYesNo</c>: ответить некому, а каждый ответ меняет файлы.
+        /// </summary>
+        public static DialogResult AskYesNoCancel(string text, string caption, MessageBoxIcon icon)
+        {
+            if (!AppUi.hasWindows)
+            {
+                throw new InvalidOperationException(
+                    "BecqMoni: " + AppUi.OneLine(caption) + ": " + AppUi.OneLine(text)
+                    + " — ответить на этот вопрос без окон некому, а каждый ответ меняет файлы.");
+            }
+            return MessageBox.Show(text, caption, MessageBoxButtons.YesNoCancel, icon, MessageBoxDefaultButton.Button3);
+        }
+
+        /// <summary>
         /// Заверение о том, ЧТО ИМЕННО открылось: не беда, а факт. Печатается
         /// ТОЛЬКО без окон и ТОЛЬКО по факту открытия файла.
         ///

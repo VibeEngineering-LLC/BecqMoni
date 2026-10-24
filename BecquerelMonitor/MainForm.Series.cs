@@ -3,40 +3,110 @@ using System.Windows.Forms;
 
 namespace BecquerelMonitor
 {
-    // #BM-12: серия измерений и закрытие документа / программы.
     public partial class MainForm
     {
         /// <summary>
-        /// Документ закрывают (или закрывается программа), пока идёт серия: спросить ОДИН раз на документ.
-        /// «Нет» — закрытие отменяется. Сам вопрос серию НЕ останавливает: закрытие ещё может быть отменено
-        /// (вопрос о сохранении, соседний документ) — серию останавливает <see cref="StopSeriesOf"/> из
-        /// <c>StopRecordingOrTesting</c>, когда закрытие подтверждено. Нет активной серии — вопроса нет.
+        /// Test seam for UI questions. When set, all yes/no and ok/cancel questions
+        /// in the series/delete flow are routed through this delegate instead of
+        /// showing a window.
+        /// </summary>
+        internal Func<string, MessageBoxButtons, DialogResult> UiAsk;
+
+        private bool AskSeries(string text)
+        {
+            if (UiAsk != null)
+            {
+                return UiAsk(text, MessageBoxButtons.YesNo) == DialogResult.Yes;
+            }
+            return AppUi.AskYesNo(text, SeriesText.Warning, MessageBoxIcon.Question, true);
+        }
+
+        private DialogResult AskDeleteSpectrum(string text, string caption)
+        {
+            if (UiAsk != null)
+            {
+                return UiAsk(text, MessageBoxButtons.OKCancel);
+            }
+            return MessageBox.Show(text, caption, MessageBoxButtons.OKCancel, MessageBoxIcon.Exclamation);
+        }
+
+        private static MeasurementSeries ActiveSeriesOf(ResultData rd)
+        {
+            if (rd == null || rd.MeasurementController == null)
+            {
+                return null;
+            }
+            var series = rd.MeasurementController.Series;
+            if (series != null && series.IsActive)
+            {
+                return series;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Подтверждение закрытия документа во время активной серии.
+        /// Задаёт вопрос один раз на документ. Если ни одна спектрограмма
+        /// документа не имеет активной серии, возвращает true без вопроса.
+        /// Сам вопрос НЕ останавливает серию (закрытие может быть отменено позже).
         /// </summary>
         internal bool ConfirmCloseDuringSeries(DocEnergySpectrum doc, Func<bool> ask = null)
         {
-            bool active = false;
-            foreach (ResultData rd in doc.ResultDataFile.ResultDataList)
-            {
-                MeasurementSeries s = rd.MeasurementController != null ? rd.MeasurementController.Series : null;
-                active = active || (s != null && s.IsActive);
-            }
-            if (!active)
+            if (doc == null || doc.ResultDataFile == null || doc.ResultDataFile.ResultDataList == null)
             {
                 return true;
             }
-            return ask != null ? ask() : MessageBox.Show(SeriesText.CloseQuestion, SeriesText.Warning, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+
+            bool hasActiveSeries = false;
+            foreach (var rd in doc.ResultDataFile.ResultDataList)
+            {
+                if (ActiveSeriesOf(rd) != null)
+                {
+                    hasActiveSeries = true;
+                    break;
+                }
+            }
+
+            if (!hasActiveSeries)
+            {
+                return true;
+            }
+
+            return ask != null ? ask() : this.AskSeries(SeriesText.CloseQuestion);
         }
 
-        /// <summary>Закрытие подтверждено: остановить серии всех спектров документа (неполный спектр не пишется).</summary>
+        internal bool ConfirmDeleteDuringSeries(ResultData rd, Func<bool> ask = null)
+        {
+            if (ActiveSeriesOf(rd) == null)
+            {
+                return true;
+            }
+            return ask != null ? ask() : this.AskSeries(SeriesText.DeleteQuestion);
+        }
+
         internal void StopSeriesOf(DocEnergySpectrum doc)
         {
-            foreach (ResultData rd in doc.ResultDataFile.ResultDataList)
+            if (doc == null || doc.ResultDataFile == null || doc.ResultDataFile.ResultDataList == null)
             {
-                MeasurementSeries s = rd.MeasurementController != null ? rd.MeasurementController.Series : null;
-                if (s != null && s.IsActive)
+                return;
+            }
+
+            foreach (var rd in doc.ResultDataFile.ResultDataList)
+            {
+                var series = ActiveSeriesOf(rd);
+                if (series != null)
                 {
-                    s.UserStop(false);
+                    series.UserStop(false);
                 }
+            }
+        }
+
+        internal void StopSeriesOfSpectrum(ResultData rd)
+        {
+            var series = ActiveSeriesOf(rd);
+            if (series != null)
+            {
+                series.UserStop(false);
             }
         }
     }

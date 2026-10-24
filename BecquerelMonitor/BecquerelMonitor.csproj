@@ -447,9 +447,6 @@
     <Compile Include="SeriesSettings.Start.cs" />
     <Compile Include="MeasurementSeries.Waiting.cs" />
     <Compile Include="SeriesStartPicker.cs" />
-    <Compile Include="SeriesSettings.Start.cs" />
-    <Compile Include="MeasurementSeries.Waiting.cs" />
-    <Compile Include="SeriesStartPicker.cs" />
     <Compile Include="SeriesSettingsForm.cs" />
     <Compile Include="SeriesHost.cs" />
     <Compile Include="DCControlPanel.Series.cs" />

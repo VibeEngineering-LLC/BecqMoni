@@ -42,6 +42,17 @@ namespace BecquerelMonitor
         public static string TcpUnavailable => T("Серия для плат TCP/REST пока недоступна.", "A series is not yet available for TCP/REST boards.");
         public static string AttachBlocked => T("Идёт серия измерений: присоединять и отсоединять прибор нельзя. Остановите серию кнопкой «Стоп».", "A measurement series is running: the device cannot be attached or detached. Stop the series with the Stop button.");
         public static string CloseQuestion => T("Идёт серия измерений. Остановить серию и закрыть?", "A measurement series is running. Stop the series and close?");
+        public static string LocalWarning(string w)
+        {
+            if (w == MeasurementSeries.WarnLowDisk) return T("на диске меньше 1 ГБ", "less than 1 GB free on the disk");
+            if (w == MeasurementSeries.WarnDiskUnknown) return T("остаток диска неизвестен", "free disk space is unknown");
+            return w;
+        }
+        public static string DeleteQuestion => T("Идёт серия измерений этого спектра. Остановить серию и удалить спектр?", "The series of this spectrum is running. Stop the series and delete the spectrum?");
+        public static string TemplateRefuse => T("В шаблоне имени нет {n} или {time}, а «не перезаписывать» выключено: каждый спектр затрёт предыдущий. Добавьте {n} в шаблон.", "The name template has no {n} or {time} and \"do not overwrite\" is off: every spectrum would replace the previous one. Add {n} to the template.");
+        public static string TemplateWarn => T("В шаблоне имени нет {n} или {time}: файлы получат суффиксы _1, _2, … Продолжить?", "The name template has no {n} or {time}: the files will get suffixes _1, _2, ... Continue?");
+        public static string LostSaved => T("Прибор потерян, пока шёл вопрос. Неполный спектр сохранён: ", "The device was lost while the question was open. The incomplete spectrum was saved: ");
+        public static string LostNotSaved => T("Прибор потерян, пока шёл вопрос. Неполный спектр НЕ сохранён: ", "The device was lost while the question was open. The incomplete spectrum was NOT saved: ");
         public static string DeviceLost => T("Прибор прервал набор.", "The device interrupted the acquisition.");
         public static string StartFailed => T("Не удалось начать набор.", "The acquisition could not be started.");
         public static string ClearFailed => T("Не удалось очистить спектр.", "The spectrum could not be cleared.");
@@ -85,7 +96,7 @@ namespace BecquerelMonitor
             string countStr = n == 0 ? "∞" : n.ToString(CultureInfo.InvariantCulture);
             string of = Ru ? "из" : "of";
             string sep = "·";
-            string warn = string.IsNullOrEmpty(ser.Warning) ? "" : " " + sep + " " + ser.Warning;
+            string warn = string.IsNullOrEmpty(ser.Warning) ? "" : " " + sep + " " + LocalWarning(ser.Warning);
 
             switch (ser.State)
             {

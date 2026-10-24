@@ -19,7 +19,22 @@ namespace BecquerelMonitor
 
         private DialogResult SeriesAsk(string text, MessageBoxButtons buttons, MessageBoxIcon icon)
         {
-            return this.SeriesDialog != null ? this.SeriesDialog(text, buttons) : MessageBox.Show(text, SeriesText.Warning, buttons, icon);
+            if (this.SeriesDialog != null)
+            {
+                return this.SeriesDialog(text, buttons);
+            }
+            // every question goes through the application's door (AppUi): without windows it refuses or prints, it never opens a window
+            if (buttons == MessageBoxButtons.YesNoCancel)
+            {
+                return AppUi.AskYesNoCancel(text, SeriesText.Warning, icon);
+            }
+            if (buttons == MessageBoxButtons.YesNo)
+            {
+                return AppUi.AskYesNo(text, SeriesText.Warning, icon, false) ? DialogResult.Yes : DialogResult.No;
+            }
+            AppUi.Report(text, SeriesText.Warning, icon);
+            return DialogResult.OK;
+
         }
 
         private void InitializeSeriesStrip()
@@ -409,6 +424,18 @@ namespace BecquerelMonitor
                 if (r == DialogResult.Cancel)
                 {
                     return 2;
+                }
+                if (s.PartialPending && s.AcquisitionId == askedId)
+                {
+                    // E4: the device was lost while the question was open; the user's answer still counts
+                    if (r == DialogResult.Yes)
+                    {
+                        string lostErr;
+                        bool saved = s.SavePartialAfterLoss(out lostErr);
+                        this.SeriesAsk(saved ? SeriesText.LostSaved + s.Files[s.Files.Count - 1] : SeriesText.LostNotSaved + lostErr, MessageBoxButtons.OK, saved ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                    }
+                    s.UserStop(false);
+                    return rd.ResultDataStatus.Recording ? 0 : 2;
                 }
                 if (!s.StopNeedsQuestion || s.AcquisitionId != askedId)
                 {

@@ -1820,6 +1820,11 @@ namespace BecquerelMonitor
             {
                 if (docEnergySpectrum.Filename == filename)
                 {
+                    // the same order as the other close paths: the series question, then the save question, and only then the irreversible stop
+                    if (!this.ConfirmCloseDuringSeries(docEnergySpectrum) || !(force || this.ConfirmSaveDocument(docEnergySpectrum)))
+                    {
+                        return;
+                    }
                     if (!this.StopRecordingOrTesting(docEnergySpectrum, true))   // the user closes the document
                     {
                         return;   // the program began to close during that Stop: it tears everything down itself
@@ -1827,12 +1832,8 @@ namespace BecquerelMonitor
                     this.DestroyVCPThreads(docEnergySpectrum);
                     this.DestroyRCThreads(docEnergySpectrum);
                     this.DestroyObsidianThreads(docEnergySpectrum);
-                    if (force || this.ConfirmSaveDocument(docEnergySpectrum))
-                    {
-                        this.UnsubscribeDocumentEvent(docEnergySpectrum);
-                        this.documentManager.CloseDocument(docEnergySpectrum);
-                        break;
-                    }
+                    this.UnsubscribeDocumentEvent(docEnergySpectrum);
+                    this.documentManager.CloseDocument(docEnergySpectrum);
                     break;
                 }
             }
@@ -2762,6 +2763,10 @@ namespace BecquerelMonitor
                 return;
             }
             ResultData activeResultData = doc.ActiveResultData;
+            if (!this.ConfirmDeleteDuringSeries(activeResultData))   // #BM-12: the series of this spectrum runs - the same question as on close
+            {
+                return;
+            }
             string name = activeResultData.SampleInfo.Name;
             string text;
             if (name == null || name == "")
@@ -2772,11 +2777,12 @@ namespace BecquerelMonitor
             {
                 text = string.Format(BecquerelMonitor.Properties.Resources.DeleteSpectrumMessage, name);
             }
-            DialogResult dialogResult = MessageBox.Show(text, BecquerelMonitor.Properties.Resources.ConfirmationDialogTitle, MessageBoxButtons.OKCancel, MessageBoxIcon.Exclamation);
+            DialogResult dialogResult = this.AskDeleteSpectrum(text, BecquerelMonitor.Properties.Resources.ConfirmationDialogTitle);
             if (dialogResult != DialogResult.OK)
             {
                 return;
             }
+            this.StopSeriesOfSpectrum(activeResultData);   // #BM-12: confirmed - the series stops before the device (the watchdog would take it for a loss); the incomplete spectrum is not written
             // Stop the recording before removing the spectrum: deleting it used to leave
             // the device controller running with no owner.
             if (activeResultData.ResultDataStatus.Recording && activeResultData.MeasurementController != null)

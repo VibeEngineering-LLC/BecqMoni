@@ -26,6 +26,8 @@ namespace BecquerelMonitor
         private Label _lblEnd;
         private SeriesStartPicker _startPicker;
 
+        /// <summary>Test seam: answers the yes/no warning of the window (null = the application's question door).</summary>
+        internal Func<string, bool> WarnAsk;
         public SeriesSettings Result { get; private set; }
 
         public SeriesSettingsForm(SeriesSettings initial, int presetSeconds, string docFolder, string docName)
@@ -301,7 +303,7 @@ namespace BecquerelMonitor
             string folder = _txtFolder.Text.Trim();
             if (string.IsNullOrEmpty(folder))
             {
-                MessageBox.Show(this, SeriesText.ErrFolder, SeriesText.Warning, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                AppUi.Report(SeriesText.ErrFolder, SeriesText.Warning, MessageBoxIcon.Warning);
                 _txtFolder.Focus();
                 return;
             }
@@ -309,7 +311,7 @@ namespace BecquerelMonitor
             string template = _txtTemplate.Text.Trim();
             if (string.IsNullOrEmpty(template))
             {
-                MessageBox.Show(this, SeriesText.ErrTemplate, SeriesText.Warning, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                AppUi.Report(SeriesText.ErrTemplate, SeriesText.Warning, MessageBoxIcon.Warning);
                 _txtTemplate.Focus();
                 return;
             }
@@ -318,6 +320,19 @@ namespace BecquerelMonitor
             int m = (int)_numMinutes.Value;
             int s = (int)_numSeconds.Value;
 
+            int problem = SeriesSettings.TemplateProblem(template, (int)_numCount.Value, _chkNoOverwrite.Checked);
+            if (problem == 2)
+            {
+                // refusal: with "do not overwrite" off every spectrum would replace the previous file
+                AppUi.Report(SeriesText.TemplateRefuse, SeriesText.Warning, MessageBoxIcon.Warning);
+                _txtTemplate.Focus();
+                return;
+            }
+            if (problem == 1 && !(WarnAsk != null ? WarnAsk(SeriesText.TemplateWarn) : AppUi.AskYesNo(this, SeriesText.TemplateWarn, SeriesText.Warning, MessageBoxIcon.Warning, false)))
+            {
+                _txtTemplate.Focus();
+                return;
+            }
             Result = _initial.Clone();
             Result.Count = (int)_numCount.Value;
             Result.DelaySeconds = h * 3600 + m * 60 + s;
