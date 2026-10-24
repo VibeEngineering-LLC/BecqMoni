@@ -37,7 +37,8 @@ SRC_FILES = ["AtomSpectraRestPolicy.cs", "AtomSpectraRestClient.cs", "AtomSpectr
              "AtomSpectraTcpDeviceConfig.cs", "AtomSpectraTcpDeviceConfig.Rest.cs", "InputDeviceConfig.cs", "Hash/Crc32.cs",
              "AtomSpectraDeviceConsole.cs", "AtomSpectraDevlog.cs", "AtomSpectraRestBootConfig.cs",
              "AtomSpectraRestSession.JoinedAndObserve.cs", "AtomSpectraTcpSession.JoinedStop.cs",
-             "AtomSpectraDnsSd.cs", "AtomSpectraDnsSd.Adapters.cs", "AtomSpectraDnsSd.Schedule.cs"]
+             "AtomSpectraDnsSd.cs", "AtomSpectraDnsSd.Adapters.cs", "AtomSpectraDnsSd.Schedule.cs",
+             "AtomSpectraFirmware.cs"]   # #BM-21: the board firmware version check
 STUBS = """namespace BecquerelMonitor.Properties { public static class Resources {
   public static string ERRAtomSpectraTcpCalBusy = "busy {0}:{1}"; public static string ERRAtomSpectraTcpConnect = "connect {0}:{1} {2}";
   public static string ERRIncorrectCRC = "crc"; public static string ERREmptyCoefficients = "empty"; public static string ERRReadDataFromPort_Empty = "noanswer";
@@ -341,6 +342,14 @@ SCENARIOS = [
     # R3 an answer given in advance only for a counting board, T5 the same board by HostKey, T4/O1 a Stop inside a running Stop
     ("console-tcp-lane-replace", ["--order", "hs", "--period", "0.5", "--cycles", "16", "--connections", "1"]),
     ("tcplane-answer-counting", None), ("tcplane-host-key", None), ("tcplane-stop-nested", None),
+    # #BM-21 (RestHarnessBm21.cs): the board firmware below 1.2.39 is a warning (test of the connection, failed Start), never a block
+    ("bm21-parse", None),
+    ("bm21-start-low", ["--fw-version", "1.2.38", "--fail-from", "0", "--fail-status", "503"]),
+    ("bm21-start-ok-low", ["--fw-version", "1.2.38", "--counting", "0", "--valid", "0"]),
+    ("bm21-start-fail-new", ["--fw-version", "1.2.39", "--fail-from", "0", "--fail-status", "503"]),
+    ("bm21-start-fail-unknown", ["--fw-version", "?", "--fail-from", "0", "--fail-status", "503"]),
+    ("bm21-test-low", ["--fw-version", "1.2.38", "--counting", "0", "--time", "5000", "--total", "1000"]),
+    ("bm21-test-new", ["--fw-version", "1.2.39-t1b", "--counting", "0", "--time", "5000", "--total", "1000"]),
 ]
 # scenarios that need the controller or the forms exist in the REAL build only (the source build prints n/a). On the real build each must
 # EXECUTE at least this many checks ("checks executed: N" of the harness); n/a or fewer is a failure of the suite, not a pass.
@@ -352,7 +361,7 @@ REAL_ONLY_MIN_CHECKS = {"f5-tcp-cal-n": 8, "f5-ctl-length-first": 5, "f5-form-ca
                         "fix2-stop-auto": 5, "fix2-after-wait-held": 3, "fix3-held-throws": 6, "fix3-offer-stop": 6, "fix4-joined-clear-text": 9, "bm10-adapters": 7, "bm10-schedule": 4, "bm18-chooser": 23, "bm18-choose-stale": 5,
                         "bm10-quiet-three": 2, "bm10-count-address": 2, "bm10-bind-fallback": 3, "bm10-log-sent": 4, "bm10-log-packets": 3, "fix9-reset-carry": 5, "fix9-reset-other-board": 6,
                         "console-tcp-fix10-stop-reenter": 3, "fix10-dns-chain": 3, "fix10-dns-limit": 2, "fix10-dns-good": 3, "fix10-reset-to-rest": 5,
-                        "fixr6-observe-hint": 5,
+                        "fixr6-observe-hint": 5, "bm21-test-low": 4, "bm21-test-new": 3,
                         # PR #38, TCP lane
                         "console-tcp-lane-replace": 13, "tcplane-answer-counting": 5, "tcplane-host-key": 4, "tcplane-stop-nested": 6}
 FIX_SCENARIOS = ["overtake", "restart-doc", "preset-new", "deferred-resumed", "clear-stale", "session-key",
@@ -623,12 +632,16 @@ MUTATIONS = [
      [("AtomSpectraRestSession.JoinedAndObserve.cs", "                ChannelBelow = below,\n                ObserveOnly = true\n", "                ChannelBelow = below\n")], "fixr6-observe-hint", False),
 ]
 
+import bm21_mutations   # #BM-21: the source mutations of the firmware version warning
+MUTATIONS.extend(bm21_mutations.MUTATIONS)
 
 # (these mutations belong to the automatic set, each reddens ITS scenario): code that exists in the REAL build only (controller,
 # forms). Each: the patched tree is built by MSBuild (build_real_mutant), the harness is built on that exe, the real-only scenarios run on it.
 # (id, description, [(file under BecquerelMonitor/, old text, new text)], the scenario that must be red)
 CTL = "AtomSpectraTcpDeviceController.cs"
 REAL_MUTATIONS = [
+    ("bm21-test-no-warning", "#BM-21: the test of the connection does not add the firmware warning under the status",
+     [("AtomSpectraTcpDeviceForm.Rest.cs", "calib) + compression, fw);", "calib) + compression, null);")], "bm21-test-low"),
     ("calibration-before-length", "the board calibration is applied BEFORE the length checks (the old order)",
      [(CTL, "if (e.Histogram.Length != spectrum.Spectrum.Length && session is AtomSpectraRestSession)", "if (boardCalibrationPending) { boardCalibrationPending = false; AtomSpectraTcpLog.Info(\"Cal\", ApplyBoardCalibration(spectrum, resultData.DeviceConfig, AtomSpectraRestCalibration.ForChannels(((AtomSpectraRestDataReadyArgs)e).Calibration, ((AtomSpectraRestDataReadyArgs)e).CalibChannels, e.Histogram.Length), configSaver)); }\n            if (e.Histogram.Length != spectrum.Spectrum.Length && session is AtomSpectraRestSession)")], "f5-ctl-length-first"),
     ("no-fold-in-controller", "the controller gives the document the 8192-channel polynomial unfolded",
@@ -705,6 +718,7 @@ FIXTURE = os.path.join(D, "fixtures", "spectrum_sample.json")   # a spectrum doc
 
 HARNESS_FILES.append(os.path.join(D, "harness", "RestFixPr37.cs"))   # PR37 fix, REST: the scenarios pr37-rest-*
 HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessFixR.cs"))   # PR #38, maintainer's REST fixes: the scenarios fixr*
+HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessBm21.cs"))   # #BM-21: the scenarios bm21-*
 HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessTcpLane.cs"))   # PR #38, TCP lane: console-tcp-lane-*, tcplane-*
 
 
@@ -921,7 +935,7 @@ def run_real_mutations(src_dir, work_dir):
 # so that a check that holds only for the language of the machine cannot pass here and fail elsewhere
 LOCALE_SCENARIOS = ["console-rest-notext", "console-rest-refused", "console-refresh-none", "form-bad-address", "form-calib", "form-calib-unset",
                     "gzip-unsupported", "gzip-ignored", "f5-ctl-headless-text", "pr37-rest-continue-other", "pr37-rest-observe-behind", "pr37-rest-texts",
-                    "night-start-text", "fix4-joined-clear-text", "rest-linklost-text", "rest-unreachable-text", "ui-console-confirm", "fixr6-observe-hint"]
+                    "night-start-text", "fix4-joined-clear-text", "rest-linklost-text", "rest-unreachable-text", "ui-console-confirm", "fixr6-observe-hint", "bm21-start-low", "bm21-test-low"]
 LOCALES = ("en-US", "ru-RU")
 
 
