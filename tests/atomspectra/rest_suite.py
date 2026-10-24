@@ -341,6 +341,9 @@ SCENARIOS = [
     # R3 an answer given in advance only for a counting board, T5 the same board by HostKey, T4/O1 a Stop inside a running Stop
     ("console-tcp-lane-replace", ["--order", "hs", "--period", "0.5", "--cycles", "16", "--connections", "1"]),
     ("tcplane-answer-counting", None), ("tcplane-host-key", None), ("tcplane-stop-nested", None),
+    # #BM-22 (RestHarnessBm22.cs): "Clear" asks ONE question in REST mode (a stopped mock board: 5000 s, 1000 counts)
+    ("bm22-yes", ["--counting", "0", "--time", "5000", "--total", "1000"]), ("bm22-no", ["--counting", "0", "--time", "5000", "--total", "1000"]),
+    ("bm22-observe", ["--counting", "0", "--time", "5000", "--total", "1000"]), ("bm22-readfail", None), ("bm22-tcp", None),
 ]
 # scenarios that need the controller or the forms exist in the REAL build only (the source build prints n/a). On the real build each must
 # EXECUTE at least this many checks ("checks executed: N" of the harness); n/a or fewer is a failure of the suite, not a pass.
@@ -354,7 +357,9 @@ REAL_ONLY_MIN_CHECKS = {"f5-tcp-cal-n": 8, "f5-ctl-length-first": 5, "f5-form-ca
                         "console-tcp-fix10-stop-reenter": 3, "fix10-dns-chain": 3, "fix10-dns-limit": 2, "fix10-dns-good": 3, "fix10-reset-to-rest": 5,
                         "fixr6-observe-hint": 5,
                         # PR #38, TCP lane
-                        "console-tcp-lane-replace": 13, "tcplane-answer-counting": 5, "tcplane-host-key": 4, "tcplane-stop-nested": 6}
+                        "console-tcp-lane-replace": 13, "tcplane-answer-counting": 5, "tcplane-host-key": 4, "tcplane-stop-nested": 6,
+                        # #BM-22
+                        "bm22-yes": 5, "bm22-no": 4, "bm22-observe": 5, "bm22-readfail": 4, "bm22-tcp": 4}
 FIX_SCENARIOS = ["overtake", "restart-doc", "preset-new", "deferred-resumed", "clear-stale", "session-key",
                  "headless-stopped", "stop-hang", "url-userinfo"]
 PASSC_SCENARIOS = ["prefix-auth", "parse", "deferred-resumed", "restart", "time-back", "nodata-404", "dead-404", "dead-flag",
@@ -655,6 +660,19 @@ REAL_MUTATIONS = [
      [("AtomSpectraTcpDeviceController.BoardOffers.cs", "if (q != null && q.ReplaceAllowed && !SnapshotFits(bins, foldChannels, documentChannels))", "if (false)")], "console-tcp-lane-replace"),
     ("answer-stopped-holds", "R3: an answer given in advance holds for a stopped board too (a -sta the window after a reset did not mention)",
      [("AtomSpectraTcpDeviceController.BoardOffers.cs", "if (q == null || !q.Counting)", "if (q == null)")], "tcplane-answer-counting"),
+    # #BM-22: "Clear" in REST mode asks one question
+    ("bm22-second-question", "#BM-22: the second question (the board's) comes back after the first",
+     [("AtomSpectraTcpDeviceController.Rest.cs", "if (!confirmed && !AtomSpectraRestUi.ConfirmClear(board))", "if (!AtomSpectraRestUi.ConfirmClear(board))")], "bm22-yes"),
+    ("bm22-no-resets", "#BM-22: the answer No still lets Clear go on",
+     [("AtomSpectraTcpDeviceController.Rest.cs", "Clear: declined, nothing is cleared (document and board)\");\n                return false;", "Clear: declined, nothing is cleared (document and board)\");\n                return true;")], "bm22-no"),
+    ("bm22-yes-no-reset", "#BM-22: the answer Yes does not reset the board",
+     [("AtomSpectraTcpDeviceController.Rest.cs", "bool ok = AtomSpectraRestUi.RunWithWait(delegate { return rest.ClearNow(CommandTimeoutMs); });", "bool ok = true;")], "bm22-yes"),
+    ("bm22-observe-board-question", "#BM-22: observe-only mode asks the board's question too",
+     [("AtomSpectraTcpDeviceController.Rest.cs", "if (rest == null || rest.ObserveOnly)", "if (rest == null)")], "bm22-observe"),
+    ("bm22-readfail-no-question", "#BM-22: a board that cannot be read clears the document without any question",
+     [("AtomSpectraTcpDeviceController.Rest.cs", "if (!DeviceController.AskClearDocument())\n                {\n                    return false;", "if (false)\n                {\n                    return false;")], "bm22-readfail"),
+    ("bm22-tcp-no-question", "#BM-22: the TCP question (the plain one) is dropped",
+     [("AtomSpectraTcpDeviceController.Rest.cs", "IsDeviceLeasedByOther(deviceGuid, r.MeasurementController))\n            {\n                return DeviceController.AskClearDocument();", "IsDeviceLeasedByOther(deviceGuid, r.MeasurementController))\n            {\n                return true;")], "bm22-tcp"),
 ]
 
 
@@ -706,6 +724,7 @@ FIXTURE = os.path.join(D, "fixtures", "spectrum_sample.json")   # a spectrum doc
 HARNESS_FILES.append(os.path.join(D, "harness", "RestFixPr37.cs"))   # PR37 fix, REST: the scenarios pr37-rest-*
 HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessFixR.cs"))   # PR #38, maintainer's REST fixes: the scenarios fixr*
 HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessTcpLane.cs"))   # PR #38, TCP lane: console-tcp-lane-*, tcplane-*
+HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessBm22.cs"))   # #BM-22: "Clear" asks one question in REST mode: bm22-*
 
 
 def copy_fixture(out_dir):
