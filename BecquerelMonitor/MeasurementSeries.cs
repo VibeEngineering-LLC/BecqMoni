@@ -88,6 +88,12 @@ namespace BecquerelMonitor
 
         public SeriesSettings Settings { get; }
 
+        /// <summary>Number of the current acquisition run: grows with every NEW spectrum (Begin, successful start of k+1). A question asked about an older run is stale.</summary>
+        public int AcquisitionId { get; private set; }
+
+        /// <summary>Warning text for the status line ("" = none); a warning does not stop the series.</summary>
+        public string Warning { get; private set; } = string.Empty;
+
         /// <summary>T: acquisition time of one spectrum, seconds (without the accumulation of a no-clear series).</summary>
         public int PresetSeconds
         {
@@ -139,6 +145,8 @@ namespace BecquerelMonitor
             LastError = string.Empty;
             BaseSeconds = baseSeconds;
             Index = 1;
+            Warning = string.Empty;
+            AcquisitionId++;
             State = SeriesState.Acquiring;
         }
 
@@ -153,8 +161,12 @@ namespace BecquerelMonitor
                 long free = _host.FreeDiskBytes(Settings.Folder);
                 if (free >= 0 && free < 1073741824L)
                 {
-                    Fail("Less than 1 GB free on the disk of the series folder");
-                    return;
+                    // PLAN-becqmoni-series.md section 5 item 9: a WARNING, the series goes on (a real failure to write stops it below)
+                    Warning = "Less than 1 GB free on the disk of the series folder";
+                }
+                else
+                {
+                    Warning = string.Empty;
                 }
             }
 
@@ -280,6 +292,7 @@ namespace BecquerelMonitor
             }
 
             Index++;
+            AcquisitionId++;
             State = SeriesState.Acquiring;
         }
 

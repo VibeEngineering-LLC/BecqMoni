@@ -39,6 +39,8 @@ namespace BecquerelMonitor
         public static string InvalidPreset => T("Для серии нужно время набора больше нуля.", "A series needs an acquisition time greater than zero.");
         public static string ClearFirst => T("Серия начнётся с очистки спектра документа. Продолжить?", "The series will start by clearing the spectrum of the document. Continue?");
         public static string StopQuestion => T("Остановить серию: сохранить текущий неполный спектр?", "Stop the series: save the current incomplete spectrum?");
+        public static string TcpUnavailable => T("Серия для плат TCP/REST пока недоступна.", "A series is not yet available for TCP/REST boards.");
+        public static string AttachBlocked => T("Идёт серия измерений: присоединять и отсоединять прибор нельзя. Остановите серию кнопкой «Стоп».", "A measurement series is running: the device cannot be attached or detached. Stop the series with the Stop button.");
         public static string CloseQuestion => T("Идёт серия измерений. Остановить серию и закрыть?", "A measurement series is running. Stop the series and close?");
         public static string DeviceLost => T("Прибор прервал набор.", "The device interrupted the acquisition.");
         public static string StartFailed => T("Не удалось начать набор.", "The acquisition could not be started.");
@@ -65,6 +67,7 @@ namespace BecquerelMonitor
             string countStr = n == 0 ? "∞" : n.ToString(CultureInfo.InvariantCulture);
             string of = Ru ? "из" : "of";
             string sep = "·";
+            string warn = string.IsNullOrEmpty(ser.Warning) ? "" : " " + sep + " " + ser.Warning;
 
             switch (ser.State)
             {
@@ -72,13 +75,13 @@ namespace BecquerelMonitor
                 case SeriesState.Saving:
                 case SeriesState.Clearing:
                     return Ru
-                        ? $"Серия: спектр {k} {of} {countStr} {sep} набор"
-                        : $"Series: spectrum {k} {of} {countStr} {sep} acquiring";
+                        ? $"Серия: спектр {k} {of} {countStr} {sep} набор{warn}"
+                        : $"Series: spectrum {k} {of} {countStr} {sep} acquiring{warn}";
                 case SeriesState.Delay:
                     string resume = SeriesSettings.FormatHms(ser.SecondsToResume);
                     return Ru
-                        ? $"Серия: спектр {k} {of} {countStr} {sep} пауза, до продолжения {resume}"
-                        : $"Series: spectrum {k} {of} {countStr} {sep} pause, {resume} until it goes on";
+                        ? $"Серия: спектр {k} {of} {countStr} {sep} пауза, до продолжения {resume}{warn}"
+                        : $"Series: spectrum {k} {of} {countStr} {sep} pause, {resume} until it goes on{warn}";
                 case SeriesState.Done:
                     return Ru
                         ? $"Серия завершена: файлов {ser.Files.Count}"

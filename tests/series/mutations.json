@@ -66,5 +66,21 @@
  {"id": "M17-start-failure-ignored", "file": "MeasurementSeries.cs",
   "old": "            if (!_host.StartAcquisition(PresetFor(Index + 1), out err))\n            {\n                Fail(err);\n                return;\n            }",
   "new": "            _host.StartAcquisition(PresetFor(Index + 1), out err);",
-  "owner": "T6", "note": "a failed start of spectrum k+1 is taken for success"}
+  "owner": "T6", "note": "a failed start of spectrum k+1 is taken for success"},
+ {"id": "M18-acq-id-not-bumped", "file": "MeasurementSeries.cs",
+  "old": "            Index++;\n            AcquisitionId++;",
+  "new": "            Index++;",
+  "owner": "T15", "note": "a stale Stop answer cannot be recognised (AcquisitionId does not change for spectrum k+1)"},
+ {"id": "M19-reserved-names-allowed", "file": "SeriesSettings.cs",
+  "old": "if (IsReservedDeviceName(",
+  "new": "if (false && IsReservedDeviceName(",
+  "owner": "T24", "note": "a reserved Windows device name is used as a file name"},
+ {"id": "M20-disk-warning-stops", "file": "MeasurementSeries.cs",
+  "old": "                    Warning = \"Less than 1 GB free on the disk of the series folder\";",
+  "new": "                    Fail(\"Less than 1 GB free\"); return;",
+  "owner": "T22", "note": "low disk space stops the series instead of a warning"},
+ {"id": "M21-warning-never-cleared", "file": "MeasurementSeries.cs",
+  "old": "                else\n                {\n                    Warning = string.Empty;\n                }",
+  "new": "                else\n                {\n                }",
+  "owner": "T22", "note": "the disk warning stays after the space is back"}
 ]

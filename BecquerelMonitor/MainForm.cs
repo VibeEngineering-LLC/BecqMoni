@@ -1792,6 +1792,10 @@ namespace BecquerelMonitor
         {
             if (this.activeDocument != null)
             {
+                if (!this.ConfirmCloseDuringSeries(this.activeDocument))   // #BM-12: закрытие из меню — тот же вопрос про серию
+                {
+                    return false;
+                }
                 if (this.ConfirmSaveDocument(this.activeDocument))
                 {
                     if (!this.StopRecordingOrTesting(this.activeDocument, true))   // the user closes the document
@@ -1921,6 +1925,7 @@ namespace BecquerelMonitor
         bool StopRecordingOrTesting(DocEnergySpectrum doc, bool manual)
         {
             bool closing = MainForm.ApplicationClosing;
+            this.StopSeriesOf(doc);   // #BM-12: закрытие подтверждено — серия останавливается раньше приборов (иначе сторож примет это за обрыв)
             // Stop ALL recording spectra of the document, not only the active one:
             // multi-recording is a normal state (OnTimer services every recording
             // ResultData), but stop/close/delete only handled ActiveResultData.

@@ -62,7 +62,7 @@ static class UiSeriesCheck
         if (mi == null) throw new Exception("ConfirmCloseDuringSeries not found");
 
         object res = mi.Invoke(mf, new object[] { doc, (Func<bool>)(() => false) });
-        if (!(bool)res) throw new Exception("Expected false when declined");
+        if ((bool)res) throw new Exception("Expected false when declined");
         if (!series.IsActive) throw new Exception("Series should still be active after decline");
 
         int askCount = 0;
@@ -96,7 +96,7 @@ static class UiSeriesCheck
         int askCount = 0;
         Func<bool> ask = () => { askCount++; return false; };
         object res = mi.Invoke(mf, new object[] { doc, ask });
-        if (!(bool)res) throw new Exception("Expected false when declined");
+        if ((bool)res) throw new Exception("Expected false when declined");
         if (askCount != 1) throw new Exception("Ask called " + askCount + " times, expected 1");
         if (!s1.IsActive) throw new Exception("Series 1 should still be active");
         if (!s2.IsActive) throw new Exception("Series 2 should still be active");

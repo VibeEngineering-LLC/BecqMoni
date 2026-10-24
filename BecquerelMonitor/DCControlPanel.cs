@@ -160,6 +160,10 @@ namespace BecquerelMonitor
                 return false;
             }
             ResultData activeResultData = activeDocument.ActiveResultData;
+            if (this.SeriesRefusesAttach(activeResultData))   // #BM-12: в серии прибор присоединять нельзя
+            {
+                return false;
+            }
             ResultDataStatus resultDataStatus = activeResultData.ResultDataStatus;
             if (this.PresetTime < 0)
             {
@@ -242,6 +246,10 @@ namespace BecquerelMonitor
                 return;
             }
             ResultData activeResultData = activeDocument.ActiveResultData;
+            if (this.SeriesRefusesAttach(activeResultData))   // #BM-12: в серии прибор отсоединять нельзя
+            {
+                return;
+            }
             if (!activeResultData.ResultDataStatus.Recording)
             {
                 return;

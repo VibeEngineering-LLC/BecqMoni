@@ -262,6 +262,13 @@ namespace BecquerelMonitor
                 return true;
             }
 
+            if (rd.DeviceConfig != null && rd.DeviceConfig.DeviceType == AtomSpectraTcpDeviceConfig.DeviceTypeId)
+            {
+                // the board asks its own questions on every reset/start and may stay unreset: a series without a person is not safe there yet
+                this.SeriesAsk(SeriesText.TcpUnavailable, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
+
             int t = this.PresetTime;
             if (t <= 0)
             {
@@ -305,6 +312,18 @@ namespace BecquerelMonitor
             return true;
         }
 
+        /// <summary>Присоединение / отсоединение прибора во время серии рассинхронизирует серию и прибор: отказ с пояснением.</summary>
+        internal bool SeriesRefusesAttach(ResultData rd)
+        {
+            MeasurementSeries s = rd != null && rd.MeasurementController != null ? rd.MeasurementController.Series : null;
+            if (s == null || !s.IsActive)
+            {
+                return false;
+            }
+            this.SeriesAsk(SeriesText.AttachBlocked, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return true;
+        }
+
         internal void SeriesAfterStart(ResultData rd, bool started)
         {
             if (rd == null || rd.MeasurementController == null)
@@ -342,12 +361,13 @@ namespace BecquerelMonitor
 
             if (s.StopNeedsQuestion)
             {
+                int askedId = s.AcquisitionId;
                 DialogResult r = this.SeriesAsk(SeriesText.StopQuestion, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                 if (r == DialogResult.Cancel)
                 {
                     return 2;
                 }
-                if (!s.StopNeedsQuestion)
+                if (!s.StopNeedsQuestion || s.AcquisitionId != askedId)
                 {
                     // the window timer went on while the question was open: spectrum k was completed and written by the series itself
                     s.UserStop(false);
@@ -413,11 +433,13 @@ namespace BecquerelMonitor
                         stopBtn.Enabled = true;
                         devConfigComboBox.Enabled = false;
                         reloadFromConfigBtn.Enabled = false;
+                        attachBtn.Enabled = false;
                         seriesCheck.Enabled = false;
                         seriesSetupBtn.Enabled = false;
                     }
                     else
                     {
+                        attachBtn.Enabled = true;
                         seriesCheck.Enabled = true;
                         seriesSetupBtn.Enabled = true;
                     }

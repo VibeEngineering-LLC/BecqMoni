@@ -173,6 +173,13 @@ namespace BecquerelMonitor
                 name = "spectrum_" + n;
             }
 
+            // Windows reserved device names (CON, PRN, AUX, NUL, COM1..9, LPT1..9) cannot be file names, with any extension
+            int dot = name.IndexOf('.');
+            if (IsReservedDeviceName((dot >= 0 ? name.Substring(0, dot) : name).TrimEnd(' ')))
+            {
+                name = "_" + name;
+            }
+
             return name;
 
             string ReplaceToken(Match match)
@@ -220,6 +227,16 @@ namespace BecquerelMonitor
 
                 return match.Value;
             }
+        }
+
+        private static bool IsReservedDeviceName(string stem)
+        {
+            string s = stem.ToUpperInvariant();
+            if (s == "CON" || s == "PRN" || s == "AUX" || s == "NUL")
+            {
+                return true;
+            }
+            return s.Length == 4 && (s.StartsWith("COM") || s.StartsWith("LPT")) && s[3] >= '1' && s[3] <= '9';
         }
 
         /// <summary>Builds the full file path for a spectrum, handling no-overwrite logic.</summary>
