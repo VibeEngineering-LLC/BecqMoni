@@ -339,6 +339,12 @@ namespace BecquerelMonitor
                 {
                     return 2;
                 }
+                if (!s.StopNeedsQuestion)
+                {
+                    // the window timer went on while the question was open: spectrum k was completed and written by the series itself
+                    s.UserStop(false);
+                    return rd.ResultDataStatus.Recording ? 0 : 2;
+                }
                 saveCurrent = (r == DialogResult.Yes);
                 return 1;
             }
