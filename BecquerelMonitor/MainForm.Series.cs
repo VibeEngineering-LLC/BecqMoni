@@ -11,7 +11,7 @@ namespace BecquerelMonitor
         /// останавливается без записи неполного спектра (приборы останавливает обычный путь закрытия);
         /// «Нет» — закрытие отменяется. Нет активной серии — вопроса нет.
         /// </summary>
-        internal bool ConfirmCloseDuringSeries(DocEnergySpectrum doc)
+        internal bool ConfirmCloseDuringSeries(DocEnergySpectrum doc, Func<bool> ask = null)
         {
             foreach (ResultData rd in doc.ResultDataFile.ResultDataList)
             {
@@ -20,8 +20,8 @@ namespace BecquerelMonitor
                 {
                     continue;
                 }
-                DialogResult answer = MessageBox.Show(SeriesText.CloseQuestion, SeriesText.Warning, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (answer != DialogResult.Yes)
+                bool yes = ask != null ? ask() : MessageBox.Show(SeriesText.CloseQuestion, SeriesText.Warning, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+                if (!yes)
                 {
                     return false;
                 }

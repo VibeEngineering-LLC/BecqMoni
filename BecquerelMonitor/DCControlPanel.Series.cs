@@ -14,6 +14,14 @@ namespace BecquerelMonitor
         private Label seriesStatusLbl;
         private bool seriesUpdating;
 
+        /// <summary>Test seam: answers every question of the series instead of a message box (null = the real box).</summary>
+        internal Func<string, MessageBoxButtons, DialogResult> SeriesDialog;
+
+        private DialogResult SeriesAsk(string text, MessageBoxButtons buttons, MessageBoxIcon icon)
+        {
+            return this.SeriesDialog != null ? this.SeriesDialog(text, buttons) : MessageBox.Show(text, SeriesText.Warning, buttons, icon);
+        }
+
         private void InitializeSeriesStrip()
         {
             seriesCheck = new CheckBox();
@@ -257,7 +265,7 @@ namespace BecquerelMonitor
             int t = this.PresetTime;
             if (t <= 0)
             {
-                MessageBox.Show(SeriesText.InvalidPreset, SeriesText.Warning, MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                this.SeriesAsk(SeriesText.InvalidPreset, MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                 return false;
             }
 
@@ -265,7 +273,7 @@ namespace BecquerelMonitor
 
             if (rd.Series.ClearBetween && status.ElapsedTime.TotalSeconds > 0)
             {
-                DialogResult dr = MessageBox.Show(SeriesText.ClearFirst, SeriesText.Warning, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                DialogResult dr = this.SeriesAsk(SeriesText.ClearFirst, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (dr == DialogResult.No)
                 {
                     if (rd.MeasurementController.SeriesHost != null)
@@ -334,7 +342,7 @@ namespace BecquerelMonitor
 
             if (s.StopNeedsQuestion)
             {
-                DialogResult r = MessageBox.Show(SeriesText.StopQuestion, SeriesText.Warning, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                DialogResult r = this.SeriesAsk(SeriesText.StopQuestion, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                 if (r == DialogResult.Cancel)
                 {
                     return 2;
