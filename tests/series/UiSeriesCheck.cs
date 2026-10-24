@@ -23,6 +23,7 @@ static class UiSeriesCheck
         fails += RunCheck("U5_attach_detach_refused_in_series", U5);
         fails += RunCheck("U6_tcp_board_refused", U6);
         fails += RunCheck("U7_tab_switch_panel_follows_document", U7);
+        fails += UiStage2.Run();
         Console.WriteLine("SUMMARY fail=" + fails);
         return fails;
     }
@@ -350,5 +351,7 @@ static class UiSeriesCheck
         }
         public void StateChanged() { }
         public void SeriesFinished() { }
+        public long MonotonicMs { get { return Environment.TickCount; } }
+        public void SetKeepAwake(bool on) { }
     }
 }

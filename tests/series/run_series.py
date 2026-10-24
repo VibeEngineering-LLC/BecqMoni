@@ -4,7 +4,7 @@ import os, json, subprocess, tempfile, shutil
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 PROD = os.path.join(REPO, "BecquerelMonitor")
-PROD_FILES = ["SeriesSettings.cs", "MeasurementSeries.cs"]
+PROD_FILES = ["SeriesSettings.cs", "SeriesSettings.Start.cs", "MeasurementSeries.cs", "MeasurementSeries.Waiting.cs"]
 import glob
 TEST_FILES = sorted(glob.glob(os.path.join(HERE, "SeriesTests*.cs")))
 MUTATIONS_FILE = os.path.join(HERE, sys.argv[sys.argv.index("--file") + 1] if "--file" in sys.argv else "mutations.json")

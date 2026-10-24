@@ -20,7 +20,25 @@ namespace SeriesTestRun
 
         public DateTime Now => Clock;
 
+        public long Mono = 1000000;
+        public bool KeepAwake;
+        public List<bool> KeepAwakeLog = new List<bool>();
+
+        public long MonotonicMs { get { return Mono; } }
+
+        public void SetKeepAwake(bool on)
+        {
+            KeepAwake = on;
+            KeepAwakeLog.Add(on);
+        }
+
         public void Advance(int seconds)
+        {
+            Clock = Clock.AddSeconds(seconds);
+            Mono += seconds * 1000L;
+        }
+
+        public void JumpClock(int seconds)
         {
             Clock = Clock.AddSeconds(seconds);
         }
@@ -441,7 +459,7 @@ namespace SeriesTestRun
                 ("T12_Names_follow_index", T12_Names_follow_index),
                 ("T13_Delay_countdown", T13_Delay_countdown),
                 ("T14_ClearFailure", T14_ClearFailure)
-            }.Concat(ExtraTests()).ToArray();
+            }.Concat(ExtraTests()).Concat(Stage2Tests()).ToArray();
 
             int pass = 0;
             int fail = 0;

@@ -316,6 +316,8 @@ namespace SeriesTestRun
                 return true;
             }
 
+            public long MonotonicMs { get { return 0; } }
+            public void SetKeepAwake(bool on) { }
             public void StateChanged() { }
             public void SeriesFinished() { }
         }
