@@ -44560,6 +44560,9 @@ The setting is saved on the board and applies to all its clients. If other progr
   <data name="MSGAtomSpectraRestClearConfirm" xml:space="preserve">
     <value>The board holds {0} h {1} min, {2} counts. Reset the spectrum ON THE BOARD? This cannot be undone.</value>
   </data>
+  <data name="MSGAtomSpectraRestClearBothConfirm" xml:space="preserve">
+    <value>The board holds {0} h {1} min, {2} counts. Clear the spectrum in the document AND reset it ON THE BOARD? This cannot be undone.</value>
+  </data>
   <data name="MSGAtomSpectraRestNotReset" xml:space="preserve">
     <value>The board was NOT reset ({0}); its spectrum is intact. While the board is polled the document is refilled from it.</value>
   </data>

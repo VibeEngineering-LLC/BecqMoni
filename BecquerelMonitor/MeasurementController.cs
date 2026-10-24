@@ -690,6 +690,24 @@ namespace BecquerelMonitor
             }
         }
 
+        // The one question before "Clear" (#BM-22); false = the user declined, nothing is to be cleared.
+        public bool ConfirmClear()
+        {
+            return this.deviceController != null ? this.deviceController.ConfirmClear(this.resultData) : DeviceController.AskClearDocument();
+        }
+
+        // "Clear" for the panel (#BM-22): one question, then the device is cleared. The caller clears the DOCUMENT only when this
+        // returns true: after "No" neither the document nor the device is touched.
+        public bool ConfirmAndClear()
+        {
+            if (!this.ConfirmClear())
+            {
+                return false;
+            }
+            this.ClearMeasurementResult();
+            return true;
+        }
+
         // Token: 0x060006AE RID: 1710 RVA: 0x0002814C File Offset: 0x0002634C
         public void ClearMeasurementResult()
         {

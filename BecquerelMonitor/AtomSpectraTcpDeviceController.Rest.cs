@@ -189,9 +189,83 @@ namespace BecquerelMonitor
             }
         }
 
+        private enum RestClearPlan { Ask, BoardConfirmed, DocumentOnly }
+
+        private RestClearPlan restClearPlan = RestClearPlan.Ask;
+        private ResultData restClearFor;
+
+        public override bool ConfirmClear(ResultData r)
+        {
+            restClearPlan = RestClearPlan.Ask;
+            restClearFor = null;
+
+            AtomSpectraTcpDeviceConfig config = ConfigOf(r);
+
+            if (deviceGuid == null
+                || config == null
+                || config.Transport != AtomSpectraTransport.Rest
+                || MeasurementController.IsDeviceLeasedByOther(deviceGuid, r.MeasurementController))
+            {
+                return DeviceController.AskClearDocument();
+            }
+
+            return ConfirmClearRest(r, config);
+        }
+
+        private bool ConfirmClearRest(ResultData r, AtomSpectraTcpDeviceConfig config)
+        {
+            OpenRestSession(config);
+            AtomSpectraRestSession rest = session as AtomSpectraRestSession;
+
+            if (rest == null || rest.ObserveOnly)
+            {
+                return DeviceController.AskClearDocument();
+            }
+
+            string error = null;
+            AtomSpectraRestBoardSample board = AtomSpectraRestUi.RunWithWait(delegate
+            {
+                string e, user;
+                AtomSpectraRestBoardSample s = rest.ReadBoard(AtomSpectraRestSession.ProbeTimeoutMs, out e, out user);
+                if (s == null) AtomSpectraTcpLog.Warn("Session", "Clear: the board was not read: " + e);
+                error = user;
+                return s;
+            });
+
+            if (board == null)
+            {
+                AppUi.Report(string.Format(CultureInfo.InvariantCulture, Resources.MSGAtomSpectraRestNotReset, error ?? Resources.AtomSpectraRestErrNoAnswer), "", MessageBoxIcon.Warning);
+
+                if (!DeviceController.AskClearDocument())
+                {
+                    return false;
+                }
+
+                restClearPlan = RestClearPlan.DocumentOnly;
+                restClearFor = r;
+                return true;
+            }
+
+            if (!AtomSpectraRestUi.ConfirmClear(board, true))
+            {
+                AtomSpectraTcpLog.Info("Session", "Clear: declined, nothing is cleared (document and board)");
+                return false;
+            }
+
+            restClearPlan = RestClearPlan.BoardConfirmed;
+            restClearFor = r;
+            return true;
+        }
+
+        // #BM-22: ClearRest below carries out what ConfirmClear has already asked (restClearPlan)
         private void ClearRest(ResultData r, AtomSpectraTcpDeviceConfig config)
         {
             if (!AppUi.HasWindows) throw new InvalidOperationException("BecqMoni: AtomSpectra REST Clear needs a confirmation window; the board was not reset.");
+            // #BM-22: ConfirmClear (the one question of "Clear") has already been answered for this document
+            RestClearPlan plan = ReferenceEquals(restClearFor, r) ? restClearPlan : RestClearPlan.Ask;
+            restClearPlan = RestClearPlan.Ask;
+            restClearFor = null;
+            if (plan == RestClearPlan.DocumentOnly) return;   // the board could not be read, the user chose to clear the document only
             OpenRestSession(config);
             AtomSpectraRestSession rest = session as AtomSpectraRestSession;
             if (rest == null)
@@ -206,7 +280,8 @@ namespace BecquerelMonitor
                 return;
             }
             string error = null;
-            AtomSpectraRestBoardSample board = AtomSpectraRestUi.RunWithWait(delegate
+            bool confirmed = plan == RestClearPlan.BoardConfirmed;   // the board's numbers were shown in the one question
+            AtomSpectraRestBoardSample board = confirmed ? null : AtomSpectraRestUi.RunWithWait(delegate
             {
                 string e, user;
                 AtomSpectraRestBoardSample s = rest.ReadBoard(AtomSpectraRestSession.ProbeTimeoutMs, out e, out user);
@@ -214,12 +289,12 @@ namespace BecquerelMonitor
                 error = user;
                 return s;
             });
-            if (board == null)
+            if (board == null && !confirmed)
             {
                 AppUi.Report(string.Format(CultureInfo.InvariantCulture, Resources.MSGAtomSpectraRestNotReset, error ?? Resources.AtomSpectraRestErrNoAnswer), "", MessageBoxIcon.Warning);
                 return;
             }
-            if (!AtomSpectraRestUi.ConfirmClear(board))
+            if (!confirmed && !AtomSpectraRestUi.ConfirmClear(board))
             {
                 AtomSpectraTcpLog.Info("Session", "Clear: declined, board not reset");
                 AppUi.Report(string.Format(CultureInfo.InvariantCulture, Resources.MSGAtomSpectraRestNotReset, Resources.AtomSpectraRestDeclined), "", MessageBoxIcon.Information);
