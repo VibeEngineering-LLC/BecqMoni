@@ -23,6 +23,7 @@ public static class UiStage3
         fails += Check8();
         fails += Check9();
         fails += Check10();
+        fails += Check12();
         fails += Check11();
         return fails;
     }
@@ -71,6 +72,52 @@ public static class UiStage3
         }
     }
 
+    private static int Check12()
+    {
+        try
+        {
+            var host = new Z3Host();
+            var settings = new SeriesSettings
+            {
+                Enabled = true,
+                Count = 5,
+                DelaySeconds = 60,
+                ClearBetween = true,
+                Folder = @"C:\s",
+                Prefix = "sp"
+            };
+            var series = new MeasurementSeries(settings, host, 600);
+            var doc = new DocEnergySpectrum();
+            var rd = doc.ActiveResultData;
+            rd.MeasurementController.Series = series;
+            series.Begin(0);
+
+            var panel = NewPanel((msg, buttons) =>
+            {
+                series.OnSpectrumComplete();
+                return DialogResult.Yes;
+            });
+
+            var result = Call(panel, "SeriesBeforeStop", new object[] { doc, rd, true, false });
+            int ret = (int)result;
+
+            if (ret == 2 && host.Saves == 1 && series.State == SeriesState.Idle)
+            {
+                Console.WriteLine("PASS Z12_stale_answer_after_pause_started");
+                return 0;
+            }
+            else
+            {
+                Console.WriteLine($"FAIL Z12_stale_answer_after_pause_started: ret={ret}, saves={host.Saves}, state={series.State}");
+                return 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"FAIL Z12_stale_answer_after_pause_started: {ex.GetType().Name}: {ex.Message}");
+            return 1;
+        }
+    }
     private static int Check2()
     {
         try

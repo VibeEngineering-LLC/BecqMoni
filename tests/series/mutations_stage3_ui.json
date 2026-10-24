@@ -1,0 +1,23 @@
+[
+ {"id": "Q01-close-question-door-bypassed", "file": "MainForm.Series.cs",
+  "old": "return AppUi.AskYesNo(text, SeriesText.Warning, MessageBoxIcon.Question, true);",
+  "new": "return true;", "note": "the series question no longer goes through the AppUi door (headless check must redden)"},
+ {"id": "Q02-stop-question-door-bypassed", "file": "DCControlPanel.Series.cs",
+  "old": "return AppUi.AskYesNoCancel(text, SeriesText.Warning, icon);",
+  "new": "return DialogResult.Yes;", "note": "the Stop question no longer goes through the AppUi door"},
+ {"id": "Q03-delete-without-question", "file": "MainForm.cs",
+  "old": "if (!this.ConfirmDeleteDuringSeries(activeResultData))",
+  "new": "if (false)", "note": "E2: deleting a spectrum does not ask about its running series"},
+ {"id": "Q04-delete-does-not-stop-series", "file": "MainForm.cs",
+  "old": "            this.StopSeriesOfSpectrum(activeResultData);",
+  "new": "", "note": "E2: confirmed delete leaves the series running"},
+ {"id": "Q05-closedocument-stops-before-asking", "file": "MainForm.cs",
+  "old": "if (!this.ConfirmCloseDuringSeries(docEnergySpectrum) || !(force || this.ConfirmSaveDocument(docEnergySpectrum)))",
+  "new": "if (false)", "note": "E1: CloseDocument(filename, force) skips both questions"},
+ {"id": "Q06-form-template-check-off", "file": "SeriesSettingsForm.cs",
+  "old": "if (problem == 2)",
+  "new": "if (false)", "note": "E3: the window accepts a template that overwrites every spectrum"},
+ {"id": "Q07-lost-partial-not-saved", "file": "DCControlPanel.Series.cs",
+  "old": "bool saved = s.SavePartialAfterLoss(out lostErr);",
+  "new": "bool saved = false; lostErr = \"\";", "note": "E4: the Yes answer after a device loss does not write the incomplete spectrum"}
+]
