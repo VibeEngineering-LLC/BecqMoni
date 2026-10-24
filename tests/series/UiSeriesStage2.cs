@@ -43,13 +43,14 @@ public static class UiStage2
 
             int askCalls = 0;
             Func<bool> ask = () => { askCalls++; return true; };
-            bool closed = (bool)Invoke(doc, "ConfirmCloseDuringSeries", new object[] { doc, ask });
+            var mf = (MainForm)FormatterServices.GetUninitializedObject(typeof(MainForm));
+            bool closed = (bool)Invoke(mf, "ConfirmCloseDuringSeries", new object[] { doc, ask });
             if (!closed) throw new Exception("ConfirmCloseDuringSeries returned false");
             if (askCalls != 1) throw new Exception("Ask called " + askCalls + " times");
             if (series.State != Waiting()) throw new Exception("State is " + series.State);
             if (!host.KeepAwake) throw new Exception("KeepAwake is false");
 
-            Invoke(doc, "StopSeriesOf", new object[] { doc });
+            Invoke(mf, "StopSeriesOf", new object[] { doc });
             if (series.State != SeriesState.Idle) throw new Exception("State is " + series.State);
             if (host.KeepAwake) throw new Exception("KeepAwake is true");
         });

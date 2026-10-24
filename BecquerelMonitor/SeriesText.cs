@@ -46,6 +46,17 @@ namespace BecquerelMonitor
         public static string StartFailed => T("Не удалось начать набор.", "The acquisition could not be started.");
         public static string ClearFailed => T("Не удалось очистить спектр.", "The spectrum could not be cleared.");
         public static string Warning => T("Серия измерений", "Measurement series");
+        public static string StartNow => T("Сразу", "Immediately");
+        public static string StartAtTime => T("В указанное время", "At the given time");
+        public static string StartIn => T("Через", "After");
+        public static string LblStart => T("Начать:", "Start:");
+        public static string StartPassed => T("Указанное время начала уже прошло. Стартовать сразу? («Нет» — отменить серию.)", "The given start time has already passed. Start at once? (\"No\" cancels the series.)");
+
+        /// <summary>Start target for the status line: the time only for today, with the date otherwise.</summary>
+        public static string StartAtText(DateTime t)
+        {
+            return t.Date == DateTime.Now.Date ? t.ToString("HH:mm", CultureInfo.InvariantCulture) : t.ToString("dd.MM HH:mm", CultureInfo.InvariantCulture);
+        }
 
         public static string Summary(SeriesSettings s, int presetSeconds)
         {
@@ -53,14 +64,21 @@ namespace BecquerelMonitor
             string mult = Ru ? "×" : "x";
             string pause = SeriesSettings.FormatHms(s.DelaySeconds);
             string total = s.TotalSeconds(presetSeconds) < 0 ? Endless : SeriesSettings.FormatHms(s.TotalSeconds(presetSeconds));
+            string start = s.StartKind == 1 ? (Ru ? ", старт в " : ", start at ") + StartAtText(s.StartAt)
+                : s.StartKind == 2 ? (Ru ? ", старт через " : ", start in ") + SeriesSettings.FormatHms(s.StartInSeconds) : "";
             return Ru
-                ? $"{count} × {SeriesSettings.FormatHms(presetSeconds)}, пауза {pause}, всего {total}"
-                : $"{count} x {SeriesSettings.FormatHms(presetSeconds)}, pause {pause}, total {total}";
+                ? $"{count} × {SeriesSettings.FormatHms(presetSeconds)}, пауза {pause}, всего {total}{start}"
+                : $"{count} x {SeriesSettings.FormatHms(presetSeconds)}, pause {pause}, total {total}{start}";
         }
 
         public static string Status(MeasurementSeries ser)
         {
             if (ser == null || ser.State == SeriesState.Idle) return "";
+            if (ser.State == SeriesState.Waiting)
+            {
+                string left = SeriesSettings.FormatHms(ser.SecondsToStart);
+                return Ru ? $"Серия: старт в {StartAtText(ser.StartAt)}, осталось {left}" : $"Series: starts at {StartAtText(ser.StartAt)}, {left} left";
+            }
 
             int k = ser.Index;
             int n = ser.Settings.Count;

@@ -234,6 +234,35 @@ namespace BecquerelMonitor
             }
         }
 
+        /// <summary>
+        /// Delayed start (stage 2): 0 = start at once, 1 = wait (<paramref name="waitSeconds"/> &gt; 0), 2 = cancelled.
+        /// A start time that has already passed is asked about, never skipped silently.
+        /// </summary>
+        internal int SeriesResolveStart(ResultData rd, DateTime now, out long waitSeconds)
+        {
+            waitSeconds = rd.Series.WaitSecondsFrom(now);
+            if (waitSeconds > 0)
+            {
+                return 1;
+            }
+            if (waitSeconds == 0)
+            {
+                return 0;
+            }
+            waitSeconds = 0;
+            return this.SeriesAsk(SeriesText.StartPassed, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes ? 0 : 2;
+        }
+
+        private static void SeriesTeardown(ResultData rd)
+        {
+            if (rd.MeasurementController.SeriesHost != null)
+            {
+                rd.MeasurementController.SeriesHost.Dispose();
+            }
+            rd.MeasurementController.SeriesHost = null;
+            rd.MeasurementController.Series = null;
+        }
+
         internal bool SeriesBegin(DocEnergySpectrum doc, ResultData rd, ResultDataStatus status)
         {
             if (rd == null || rd.MeasurementController == null)
@@ -278,6 +307,14 @@ namespace BecquerelMonitor
 
             MeasurementSeries s = SeriesHost.Create(this.mainForm, doc, rd, t);
 
+            long waitSeconds;
+            int startMode = this.SeriesResolveStart(rd, DateTime.Now, out waitSeconds);
+            if (startMode == 2)
+            {
+                SeriesTeardown(rd);
+                return false;
+            }
+
             if (rd.Series.ClearBetween && status.ElapsedTime.TotalSeconds > 0)
             {
                 DialogResult dr = this.SeriesAsk(SeriesText.ClearFirst, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -292,8 +329,9 @@ namespace BecquerelMonitor
                     return false;
                 }
 
-                string err;
-                if (!rd.MeasurementController.SeriesHost.ClearSpectrum(out err))
+                string err = "";
+                // a waiting series clears at its start (the question above is the consent), not now
+                if (startMode == 0 && !rd.MeasurementController.SeriesHost.ClearSpectrum(out err))
                 {
                     AppUi.Report(err, SeriesText.Warning, MessageBoxIcon.Warning);
                     if (rd.MeasurementController.SeriesHost != null)
@@ -307,6 +345,11 @@ namespace BecquerelMonitor
             }
 
             int baseSeconds = rd.Series.ClearBetween ? 0 : (int)status.ElapsedTime.TotalSeconds;
+            if (startMode == 1)
+            {
+                s.BeginWaiting(baseSeconds, (int)Math.Min(waitSeconds, int.MaxValue));
+                return false;   // the device is not touched while the series waits
+            }
             s.Begin(baseSeconds);
             status.PresetTime = s.PresetFor(1);
             return true;

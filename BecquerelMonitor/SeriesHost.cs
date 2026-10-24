@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Serialization;
@@ -71,8 +72,39 @@ namespace BecquerelMonitor
             _timer.Start();
         }
 
+        [DllImport("kernel32.dll")]
+        private static extern uint SetThreadExecutionState(uint flags);
+
+        private const uint EsContinuous = 0x80000000;
+        private const uint EsSystemRequired = 0x00000001;
+        private bool _awakeHeld;
+
+        /// <summary>Monotonic milliseconds (Stopwatch): a change of the system time does not move it.</summary>
+        public long MonotonicMs
+        {
+            get { return Stopwatch.GetTimestamp() * 1000L / Stopwatch.Frequency; }
+        }
+
+        /// <summary>Forbids / allows the system sleep for the thread that called it (the UI thread, as all series code).</summary>
+        public void SetKeepAwake(bool on)
+        {
+            try
+            {
+                SetThreadExecutionState(on ? (EsContinuous | EsSystemRequired) : EsContinuous);
+                _awakeHeld = on;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine("SeriesHost.SetKeepAwake: " + ex);
+            }
+        }
+
         public void Dispose()
         {
+            if (_awakeHeld)
+            {
+                SetKeepAwake(false);   // closing a document / an exception must never leave the computer unable to sleep
+            }
             if (_timer != null)
             {
                 _timer.Stop();
@@ -309,7 +341,7 @@ namespace BecquerelMonitor
                     _lostTicks = 0;
                 }
 
-                if (_series.State == SeriesState.Delay && _mainForm.ActiveDocument == _doc)
+                if ((_series.State == SeriesState.Delay || _series.State == SeriesState.Waiting) && _mainForm.ActiveDocument == _doc)
                 {
                     _mainForm.ControlPanel.ShowSeriesCountdown(_doc, _rd);
                 }
@@ -317,6 +349,10 @@ namespace BecquerelMonitor
             catch (Exception ex)
             {
                 Trace.WriteLine("SeriesHost.OnTimerTick: " + ex);
+                if (_awakeHeld)
+                {
+                    SetKeepAwake(false);   // an exception in the waiting loop releases the sleep lock
+                }
             }
         }
     }

@@ -222,16 +222,16 @@ namespace SeriesTestRun
             DateTime now = new DateTime(2026, 10, 24, 12, 0, 0);
 
             s.StartKind = 0;
-            Eq(now.AddSeconds(1320), s.ExpectedEnd(now, 600), "kind 0 end");
+            Eq(now.AddSeconds(1920), s.ExpectedEnd(now, 600), "kind 0 end");
 
             s.StartKind = 1;
             s.StartAt = now.AddHours(2);
-            Eq(s.StartAt.AddSeconds(1320), s.ExpectedEnd(now, 600), "kind 1 end");
-            True(s.ExpectedEnd(now, 600) != now.AddSeconds(1320), "kind 1 not now-based");
+            Eq(s.StartAt.AddSeconds(1920), s.ExpectedEnd(now, 600), "kind 1 end");
+            True(s.ExpectedEnd(now, 600) != now.AddSeconds(1920), "kind 1 not now-based");
 
             s.StartKind = 2;
             s.StartInSeconds = 90;
-            Eq(now.AddSeconds(90 + 1320), s.ExpectedEnd(now, 600), "kind 2 end");
+            Eq(now.AddSeconds(90 + 1920), s.ExpectedEnd(now, 600), "kind 2 end");
 
             s.Count = 0;
             s.StartKind = 0;

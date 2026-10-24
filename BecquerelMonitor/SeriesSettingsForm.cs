@@ -24,6 +24,7 @@ namespace BecquerelMonitor
         private Label _lblExample;
         private Label _lblTotal;
         private Label _lblEnd;
+        private SeriesStartPicker _startPicker;
 
         public SeriesSettings Result { get; private set; }
 
@@ -52,11 +53,11 @@ namespace BecquerelMonitor
                 AutoSize = true,
                 Padding = new Padding(12),
                 ColumnCount = 2,
-                RowCount = 12
+                RowCount = 13
             };
             table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            for (int i = 0; i < 12; i++)
+            for (int i = 0; i < 13; i++)
                 table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             // Row 1: Count
@@ -180,7 +181,14 @@ namespace BecquerelMonitor
             table.Controls.Add(MakeLabel(SeriesText.LblEnd), 0, 10);
             table.Controls.Add(_lblEnd, 1, 10);
 
-            // Row 12: Buttons
+            // Row 12: Start (delayed start, stage 2)
+            _startPicker = new SeriesStartPicker();
+            _startPicker.Load(initial);
+            _startPicker.Changed += (s, e) => Recalc();
+            table.Controls.Add(MakeLabel(SeriesText.LblStart), 0, 11);
+            table.Controls.Add(_startPicker, 1, 11);
+
+            // Row 13: Buttons
             var flowButtons = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -202,7 +210,7 @@ namespace BecquerelMonitor
             btnOk.Click += BtnOk_Click;
             flowButtons.Controls.Add(btnCancel);
             flowButtons.Controls.Add(btnOk);
-            table.Controls.Add(flowButtons, 0, 11);
+            table.Controls.Add(flowButtons, 0, 12);
             table.SetColumnSpan(flowButtons, 2);
 
             Controls.Add(table);
@@ -257,6 +265,7 @@ namespace BecquerelMonitor
                     Prefix = prefix,
                     NoOverwrite = _chkNoOverwrite.Checked
                 };
+                _startPicker.Save(temp);
                 long totalSecs = temp.TotalSeconds(_presetSeconds);
                 if (totalSecs == -1)
                 {
@@ -266,7 +275,8 @@ namespace BecquerelMonitor
                 else
                 {
                     _lblTotal.Text = SeriesSettings.FormatHms(totalSecs);
-                    _lblEnd.Text = DateTime.Now.AddSeconds(totalSecs).ToString("g");
+                    // the end counts from the START target (delayed start), not from now
+                    _lblEnd.Text = temp.ExpectedEnd(DateTime.Now, _presetSeconds).Value.ToString("g");
                 }
             }
         }
@@ -316,6 +326,7 @@ namespace BecquerelMonitor
             Result.Template = template;
             Result.Prefix = _txtPrefix.Text.Trim();
             Result.NoOverwrite = _chkNoOverwrite.Checked;
+            _startPicker.Save(Result);
             // Enabled is kept from initial (Clone preserves it)
             Result.Normalize();
 

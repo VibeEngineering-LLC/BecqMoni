@@ -13,7 +13,7 @@ namespace BecquerelMonitor
     /// plus pure helpers for file names and totals.
     /// </summary>
     [Serializable]
-    public class SeriesSettings
+    public partial class SeriesSettings
     {
         /// <summary>Gets or sets a value indicating whether the series is enabled.</summary>
         public bool Enabled { get; set; }
@@ -57,7 +57,10 @@ namespace BecquerelMonitor
                 Folder = this.Folder,
                 Template = this.Template,
                 Prefix = this.Prefix,
-                NoOverwrite = this.NoOverwrite
+                NoOverwrite = this.NoOverwrite,
+                StartKind = this.StartKind,
+                StartAt = this.StartAt,
+                StartInSeconds = this.StartInSeconds
             };
         }
 
@@ -81,6 +84,12 @@ namespace BecquerelMonitor
             {
                 this.DelaySeconds = 359999;
             }
+
+            if (this.StartKind < 0 || this.StartKind > 2)
+            {
+                this.StartKind = 0;
+            }
+            this.StartInSeconds = Math.Max(0, Math.Min(359999, this.StartInSeconds));
 
             if (string.IsNullOrWhiteSpace(this.Template))
             {

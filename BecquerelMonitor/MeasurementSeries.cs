@@ -12,7 +12,8 @@ namespace BecquerelMonitor
         Delay,
         Clearing,
         Done,
-        PausedError
+        PausedError,
+        Waiting
     }
 
     public interface ISeriesHost
@@ -25,9 +26,11 @@ namespace BecquerelMonitor
         bool StartAcquisition(int presetSeconds, out string error);
         void StateChanged();
         void SeriesFinished();
+        long MonotonicMs { get; }
+        void SetKeepAwake(bool on);
     }
 
-    public sealed class MeasurementSeries
+    public sealed partial class MeasurementSeries
     {
         private readonly ISeriesHost _host;
         private readonly int _presetSeconds;
@@ -57,7 +60,16 @@ namespace BecquerelMonitor
             {
                 if (_state != value)
                 {
+                    SeriesState was = _state;
                     _state = value;
+                    if (value == SeriesState.Waiting)
+                    {
+                        _host.SetKeepAwake(true);    // the computer must not sleep while the series waits for its start
+                    }
+                    else if (was == SeriesState.Waiting)
+                    {
+                        _host.SetKeepAwake(false);   // every way out of Waiting releases it (start, Stop, failure)
+                    }
                     _host.StateChanged();
                 }
             }
@@ -102,7 +114,7 @@ namespace BecquerelMonitor
 
         public bool IsActive
         {
-            get { return _state == SeriesState.Acquiring || _state == SeriesState.Saving || _state == SeriesState.Delay || _state == SeriesState.Clearing; }
+            get { return _state == SeriesState.Acquiring || _state == SeriesState.Saving || _state == SeriesState.Delay || _state == SeriesState.Clearing || _state == SeriesState.Waiting; }
         }
 
         public bool StopNeedsQuestion
@@ -210,6 +222,7 @@ namespace BecquerelMonitor
 
         public void Tick()
         {
+            TickWaiting();
             if (_state == SeriesState.Delay && _host.Now >= _delayEnd)
             {
                 Proceed();
@@ -250,6 +263,10 @@ namespace BecquerelMonitor
 
                     _files.Add(path);
                 }
+                State = SeriesState.Idle;
+            }
+            else if (_state == SeriesState.Waiting)
+            {
                 State = SeriesState.Idle;
             }
             else if (_state == SeriesState.Delay || _state == SeriesState.Clearing || _state == SeriesState.Saving)

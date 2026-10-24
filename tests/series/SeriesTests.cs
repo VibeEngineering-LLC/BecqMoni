@@ -144,9 +144,9 @@ namespace SeriesTestRun
         internal static void Eq<T>(T expected, T actual, string what)
         {
             bool same;
-            if (expected is System.Collections.Generic.IEnumerable<string> && actual is System.Collections.Generic.IEnumerable<string>)
+            if (expected is System.Collections.IEnumerable && !(expected is string) && actual is System.Collections.IEnumerable)
             {
-                same = ((System.Collections.Generic.IEnumerable<string>)expected).SequenceEqual((System.Collections.Generic.IEnumerable<string>)actual);
+                same = ((System.Collections.IEnumerable)expected).Cast<object>().SequenceEqual(((System.Collections.IEnumerable)actual).Cast<object>());
             }
             else
             {
@@ -160,8 +160,8 @@ namespace SeriesTestRun
 
         internal static string Show(object o)
         {
-            var e = o as System.Collections.Generic.IEnumerable<string>;
-            return e != null && !(o is string) ? "[" + string.Join(", ", e) + "]" : Convert.ToString(o);
+            var e = o as System.Collections.IEnumerable;
+            return e != null && !(o is string) ? "[" + string.Join(", ", e.Cast<object>()) + "]" : Convert.ToString(o);
         }
 
         internal static void Contains(string haystack, string needle, string what)
