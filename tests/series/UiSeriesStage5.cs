@@ -84,6 +84,8 @@ public static class UiStage5
         if (capturedButtons != MessageBoxButtons.OK) throw new Exception("Buttons not OK for " + DescribeType(deviceType));
         if (string.IsNullOrEmpty(capturedText)) throw new Exception("Text is empty for " + DescribeType(deviceType));
         if (capturedText.Contains("TCP/REST")) throw new Exception("Text contains TCP/REST for " + DescribeType(deviceType));
+        string expectedText = (string)typeof(DCControlPanel).Assembly.GetType("BecquerelMonitor.SeriesText").GetProperty("DeviceNotSupported", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).GetValue(null, null);
+        if (capturedText != expectedText) throw new Exception("Refusal text is not the white-list text for " + DescribeType(deviceType) + ": " + capturedText);
     }
 
     private static void Z22()
