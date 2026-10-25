@@ -25,6 +25,7 @@ static class UiSeriesCheck
         fails += RunCheck("U7_tab_switch_panel_follows_document", U7);
         fails += UiStage2.Run();
         fails += UiStage3.Run();
+        fails += UiStage4.Run();
         Console.WriteLine("SUMMARY fail=" + fails);
         return fails;
     }

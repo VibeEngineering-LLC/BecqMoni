@@ -459,7 +459,7 @@ namespace SeriesTestRun
                 ("T12_Names_follow_index", T12_Names_follow_index),
                 ("T13_Delay_countdown", T13_Delay_countdown),
                 ("T14_ClearFailure", T14_ClearFailure)
-            }.Concat(ExtraTests()).Concat(Stage2Tests()).Concat(Stage3Tests()).ToArray();
+            }.Concat(ExtraTests()).Concat(Stage2Tests()).Concat(Stage3Tests()).Concat(Stage4Tests()).ToArray();
 
             int pass = 0;
             int fail = 0;
