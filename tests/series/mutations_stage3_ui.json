@@ -12,7 +12,7 @@
   "old": "            this.StopSeriesOfSpectrum(activeResultData);",
   "new": "", "note": "E2: confirmed delete leaves the series running"},
  {"id": "Q05-closedocument-stops-before-asking", "file": "MainForm.cs",
-  "old": "if (!this.ConfirmCloseDuringSeries(docEnergySpectrum) || !(force || this.ConfirmSaveDocument(docEnergySpectrum)))",
+  "old": "if (!this.ConfirmCloseSequence(docEnergySpectrum, force))",
   "new": "if (false)", "note": "E1: CloseDocument(filename, force) skips both questions"},
  {"id": "Q06-form-template-check-off", "file": "SeriesSettingsForm.cs",
   "old": "if (problem == 2)",

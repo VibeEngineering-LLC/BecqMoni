@@ -3,7 +3,7 @@
   "old": "return ask != null ? ask() : this.AskSeries(SeriesText.CloseQuestion);",
   "new": "return true;", "note": "ConfirmCloseDuringSeries never asks"},
  {"id": "Y02-menu-close-no-question", "file": "MainForm.cs",
-  "old": "if (!this.ConfirmCloseDuringSeries(this.activeDocument))", "new": "if (false)",
+  "old": "if (!this.ConfirmCloseSequence(this.activeDocument, false))", "new": "if (false)",
   "note": "menu File-Close does not call the series question"},
  {"id": "Y03-tab-close-no-question", "file": "MainForm.cs",
   "old": "if (!this.ConfirmCloseDuringSeries(docEnergySpectrum))", "new": "if (false)",
