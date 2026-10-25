@@ -153,6 +153,15 @@ static partial class BoardCheck
         }
     }
 
+    static int ClosedPort()
+    {
+        System.Net.Sockets.TcpListener l = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        l.Start();
+        int p = ((IPEndPoint)l.LocalEndpoint).Port;
+        l.Stop();
+        return p;
+    }
+
     static void Note(string s)
     {
         Console.WriteLine("  note: " + s);
@@ -182,7 +191,8 @@ static partial class BoardCheck
             {
                 Transport = AtomSpectraTransport.TcpBridge,
                 Host = "127.0.0.1",
-                TcpPort = Port
+                TcpPort = Transport == "tcpfw" ? ClosedPort() : Port,   // tcpfw: the TCP port is closed, the REST stub (firmware answer) is at Port
+                RestPort = Transport == "tcpfw" ? Port : AtomSpectraTcpDeviceConfig.DefaultRestPort
             };
         }
 

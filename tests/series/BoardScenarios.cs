@@ -28,7 +28,7 @@ static partial class BoardCheck
             case "sto_fail": S_sto_fail(); break;
             case "windowed_control": S_windowed_control(); break;
             case "windowed_series": S_windowed_series(); break;
-            default: Check(false, "unknown scenario " + name); break;
+            default: if (!RunPr1(name)) Check(false, "unknown scenario " + name); break;
         }
     }
 

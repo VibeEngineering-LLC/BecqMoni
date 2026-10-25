@@ -48,6 +48,15 @@ SCENARIOS = [
     ("reuse_foreign", "rest", []),
     ("observe", "rest", []),
     ("windowed_series", "rest", []),
+    # PR1 integration (#BM-12 IMPL-8): a manual Clear in a series, the one question, the firmware hint
+    ("clear_mid", "tcp", []),
+    ("clear_alone", "tcp", []),
+    ("clear_no", "tcp", []),
+    ("clear_mid", "rest", []),
+    ("clear_alone", "rest", []),
+    ("clear_no", "rest", []),
+    ("fw_connfail", "tcpfw", ["--fw-version", "1.2.38"]),
+    ("fw_old_ok", "rest", ["--fw-version", "1.2.38"]),
 ]
 
 
@@ -125,6 +134,7 @@ def main():
         "-out:BoardCheck.exe",
         str(file1),
         str(file2),
+        str(HERE / "BoardScenariosPr1.cs"),
     ]
     try:
         build_proc = subprocess.run(
