@@ -8944,6 +8944,15 @@ namespace BecquerelMonitor.Properties {
                 return ResourceManager.GetString("MSGAtomSpectraRestClearConfirm", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The board holds {0} h {1} min, {2} counts. Clear the spectrum in the document AND reset it ON THE BOARD? This cannot be undone..
+        /// </summary>
+        public static string MSGAtomSpectraRestClearBothConfirm {
+            get {
+                return ResourceManager.GetString("MSGAtomSpectraRestClearBothConfirm", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to The board was NOT reset ({0}); its spectrum is intact. While the board is polled the document is refilled from it..

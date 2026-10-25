@@ -3325,6 +3325,9 @@ http://xptable.sourceforge.net/</value>
   <data name="MSGAtomSpectraRestClearConfirm" xml:space="preserve">
     <value>На плате набрано {0} ч {1} мин, импульсов {2}. Сбросить спектр НА ПЛАТЕ? Отменить будет нельзя.</value>
   </data>
+  <data name="MSGAtomSpectraRestClearBothConfirm" xml:space="preserve">
+    <value>На плате набрано {0} ч {1} мин, импульсов {2}. Очистить спектр в документе И сбросить его НА ПЛАТЕ? Отменить будет нельзя.</value>
+  </data>
   <data name="MSGAtomSpectraRestNotReset" xml:space="preserve">
     <value>Плата НЕ сброшена ({0}); её спектр цел. Пока идёт опрос, документ заполняется с платы заново.</value>
   </data>

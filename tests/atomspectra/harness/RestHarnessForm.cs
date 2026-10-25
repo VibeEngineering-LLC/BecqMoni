@@ -11,6 +11,7 @@ namespace RestHarness
     {
         static bool RunForm(string scenario, string[] args)
         {
+            if (scenario.StartsWith("bm22-")) return RunBm22(scenario);   // #BM-22: Clear asks one question (RestHarnessBm22.cs)
             if (RunUiFix(scenario)) return true;   // PR37 fix, UI lane (UiFix.cs)
             if (scenario.StartsWith("fixr")) return RunFixR(scenario);   // PR #38, maintainer's REST fixes (RestHarnessFixR.cs)
             if (scenario.StartsWith("tcplane-") || scenario.StartsWith("console-tcp-lane-")) return RunTcpLane(scenario);   // PR #38, TCP lane (RestHarnessTcpLane.cs)
