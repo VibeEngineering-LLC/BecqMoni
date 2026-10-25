@@ -471,7 +471,7 @@ namespace BecquerelMonitor
             }
             IAtomSpectraSession s = session;
             bool newDoc = start && newDocumentCreated;
-            string info = null, calibration = null;
+            string info = null, calibration = null, boardFirmware = null;   // boardFirmware: read only after a Start without an answer
             AtomSpectraTcpBeginOutcome outcome = AtomSpectraRestUi.RunWithWait(delegate
             {
                 AtomSpectraTcpBeginOutcome o = s.Begin(newDoc, CommandTimeoutMs);
@@ -480,6 +480,12 @@ namespace BecquerelMonitor
                     // -inf and -cal behind the same wait window, not on the UI thread after it (InfoTimeoutMs each)
                     info = QueryQuietly(s, "-inf");
                     calibration = QueryQuietly(s, "-cal");
+                }
+                else if (AtomSpectraFirmware.IsNoAnswerOutcome(o))
+                {
+                    // one short GET /api/status behind the same wait window; its own failure is ignored (null)
+                    string urlError;
+                    boardFirmware = AtomSpectraFirmware.ReadVersion(config.CreateRestClient(out urlError), AtomSpectraRestSession.FirmwareReadMs);
                 }
                 return o;
             });
@@ -538,6 +544,7 @@ namespace BecquerelMonitor
                     refusal = string.Format(CultureInfo.InvariantCulture, Resources.ERRAtomSpectraTcpNoAnswer, config.Host, s.Port);
                     break;
             }
+            refusal = AtomSpectraFirmware.AppendWarning(refusal, boardFirmware);   // a known version below 1.2.39 only; otherwise the text stays as it is
             return false;
         }
 

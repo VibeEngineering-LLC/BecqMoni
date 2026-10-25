@@ -83,7 +83,8 @@ def build_src(out_dir, src_dir, mutation):
         "AtomSpectraRestCalibration.cs",
         # the partial files of the two sessions added by PR #38 (the Stop question of a joined acquisition, Replace in observe-only mode)
         "AtomSpectraTcpSession.JoinedStop.cs",
-        "AtomSpectraRestSession.JoinedAndObserve.cs"
+        "AtomSpectraRestSession.JoinedAndObserve.cs",
+        "AtomSpectraFirmware.cs"   # #BM-21: AtomSpectraRestSession reads the board firmware version after a failed Start
     ]
     
     texts = []

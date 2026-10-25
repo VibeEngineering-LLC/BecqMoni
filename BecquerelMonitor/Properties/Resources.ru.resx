@@ -3256,6 +3256,9 @@ http://xptable.sourceforge.net/</value>
   <data name="AtomSpectraRestTestResult" xml:space="preserve">
     <value>{0}: прошивка {1}, время платы {2} с, импульсов {3}; калибровка {4}.</value>
   </data>
+  <data name="AtomSpectraFirmwareBelow" xml:space="preserve">
+    <value>Прошивка платы {0} ниже рекомендуемой {1}: поиск плат и «Старт» могут не работать — обновите прошивку.</value>
+  </data>
   <data name="AtomSpectraRestCalibSet" xml:space="preserve">
     <value>задана на плате</value>
   </data>

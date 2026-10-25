@@ -8748,6 +8748,15 @@ namespace BecquerelMonitor.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to AtomSpectra board firmware {0} is older than the recommended {1}: the board search and "Start" may not work - update the board firmware..
+        /// </summary>
+        public static string AtomSpectraFirmwareBelow {
+            get {
+                return ResourceManager.GetString("AtomSpectraFirmwareBelow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to set on the board.
         /// </summary>
         public static string AtomSpectraRestCalibSet {
