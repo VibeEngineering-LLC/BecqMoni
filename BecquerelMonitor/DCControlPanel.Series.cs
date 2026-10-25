@@ -311,15 +311,10 @@ namespace BecquerelMonitor
                 return true;
             }
 
-            if (!SeriesDevices.IsAllowed(rd.DeviceConfig != null ? rd.DeviceConfig.DeviceType : null))   // IMPL-5: a white list of device types
+            string refusal = SeriesDevices.RefusalText(rd);   // IMPL-5/6: a white list of device types; a REST board in observe-only mode
+            if (refusal != null)
             {
-                this.SeriesAsk(SeriesText.DeviceNotSupported, MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return false;
-            }
-            if (rd.DeviceConfig != null && rd.DeviceConfig.DeviceType == AtomSpectraTcpDeviceConfig.DeviceTypeId)
-            {
-                // the board asks its own questions on every reset/start and may stay unreset: a series without a person is not safe there yet
-                this.SeriesAsk(SeriesText.TcpUnavailable, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                this.SeriesAsk(refusal, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return false;
             }
 
@@ -406,7 +401,9 @@ namespace BecquerelMonitor
             MeasurementSeries s = rd.MeasurementController.Series;
             if (!started && s != null && s.IsActive)
             {
+                string why = SeriesDevices.BoardRefusal(rd);   // IMPL-6: the board's reason (a series gets no box from the device)
                 s.UserStop(false);
+                if (why.Length > 0) this.SeriesAsk(why, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -503,7 +500,8 @@ namespace BecquerelMonitor
 
                 if (rd != null)
                 {
-                    bool supported = SeriesDevices.IsAllowed(rd.DeviceConfig != null ? rd.DeviceConfig.DeviceType : null);   // IMPL-5: the controls follow the device type
+                    string shortRefusal = SeriesDevices.ShortText(rd);   // IMPL-5/6: the controls follow the device type and the observe-only mode
+                    bool supported = shortRefusal == null;
                     bool enabled = rd.Series != null && rd.Series.Enabled;
                     seriesCheck.Checked = enabled;
                     MeasurementSeries s = rd.MeasurementController != null ? rd.MeasurementController.Series : null;
@@ -519,7 +517,7 @@ namespace BecquerelMonitor
                         seriesSummaryLbl.Text = "";
                     }
 
-                    string statusText = s != null ? SeriesText.Status(s) : (supported ? "" : SeriesText.DeviceNotSupportedShort);
+                    string statusText = s != null ? SeriesText.Status(s) : (supported ? "" : shortRefusal);
                     seriesStatusLbl.Text = statusText;
 
                     bool isError = s != null && s.State == SeriesState.PausedError;

@@ -68,6 +68,23 @@ namespace BecquerelMonitor
             get { return session != null && session.IsLinkLost; }
         }
 
+        // #BM-12 (IMPL-6): while a series is active on this document the board is never asked a question, never joined and never given
+        // a window of its own: a refusal is kept for the series (SeriesRefusal) instead of a box, and the series goes to Paused-Error
+        internal static Func<bool> WindowsForAsk = () => AppUi.HasWindows;   // seam of the test stand: the headless stand has no windows
+
+        internal string SeriesRefusal { get; private set; }
+
+        internal static bool SeriesStrict(ResultData r)
+        {
+            MeasurementSeries s = r != null && r.MeasurementController != null ? r.MeasurementController.Series : null;
+            return s != null && s.IsActive;
+        }
+
+        internal static bool AskAllowed(bool hasWindows, bool seriesStrict)
+        {
+            return hasWindows && !seriesStrict;
+        }
+
         public static bool IsHostInUse(string host, int port)
         {
             return AtomSpectraTcpSession.IsHostInUse(host, port);
@@ -205,6 +222,7 @@ namespace BecquerelMonitor
             {
                 // A joined acquisition is not ours: its reset is asked first, with the board's numbers (as REST ConfirmClear).
                 // Without windows AskYesNo throws (S100) and nothing goes to the board.
+                if (session.JoinedRunning && SeriesStrict(r)) throw new InvalidOperationException(SeriesText.BoardCounting);   // a series never clears a board it did not start
                 if (session.JoinedRunning && !ConfirmJoinedClear(session))
                 {
                     AtomSpectraTcpLog.Info("Session", "Clear of a joined acquisition: declined, the board is not reset");
@@ -295,7 +313,7 @@ namespace BecquerelMonitor
             CloseSession();
         }
 
-        private static AtomSpectraTcpDeviceConfig ConfigOf(ResultData resultData)
+        internal static AtomSpectraTcpDeviceConfig ConfigOf(ResultData resultData)
         {
             if (resultData == null || resultData.DeviceConfig == null)
             {
@@ -393,6 +411,7 @@ namespace BecquerelMonitor
         private bool BeginSession(ResultData r, bool start)
         {
             resultData = r;
+            SeriesRefusal = null;
             deviceGuid = r.DeviceConfig != null ? r.DeviceConfig.Guid : null;
 
             AtomSpectraTcpDeviceConfig config = ConfigOf(r);
@@ -429,6 +448,7 @@ namespace BecquerelMonitor
                 return true;
             }
             r.ResultDataStatus.Recording = false;
+            if (refusal == null && SeriesStrict(r)) refusal = SeriesText.BoardNotReady;   // a series has nobody to answer a question: no silent Cancel
             return refusal == null ? false : Refuse(refusal);   // null: "Cancel" in the Start dialog, nothing to say
         }
 
@@ -444,7 +464,8 @@ namespace BecquerelMonitor
             int foldChannels = ProfileChannels(r);   // the channels every snapshot is folded to (FoldAndUpdate)
             if (tcp != null)
             {
-                tcp.Ask = AppUi.HasWindows ? ReplaceOnlyIfFolds(r, foldChannels, AnswerGiven(r, new Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice>(q => { q.Note = StartNote(tcp); return AtomSpectraRestUi.AskStart(q); }))) : null;
+                tcp.SeriesRun = SeriesStrict(r);
+                tcp.Ask = AskAllowed(WindowsForAsk(), SeriesStrict(r)) ? ReplaceOnlyIfFolds(r, foldChannels, AnswerGiven(r, new Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice>(q => { q.Note = StartNote(tcp); return AtomSpectraRestUi.AskStart(q); }))) : null;
                 tcp.DocumentSeconds = (long)r.ResultDataStatus.ElapsedTime.TotalSeconds;
                 tcp.DocumentCounts = r.EnergySpectrum != null ? r.EnergySpectrum.ValidPulseCount : 0;
             }
@@ -543,6 +564,7 @@ namespace BecquerelMonitor
         private static string RefusalText(AtomSpectraTcpSession tcp)
         {
             AtomSpectraTcpRefusal why = tcp != null ? tcp.Refusal : AtomSpectraTcpRefusal.StoppedWithData;
+            if (tcp != null && tcp.SeriesRun) return why == AtomSpectraTcpRefusal.SeriesBoardCounting ? SeriesText.BoardCounting : SeriesText.BoardNotReady;   // a series has no window to ask in
             switch (why)
             {
                 case AtomSpectraTcpRefusal.Unknown:
@@ -571,6 +593,13 @@ namespace BecquerelMonitor
 
         private bool Refuse(string message)
         {
+            if (SeriesStrict(resultData))
+            {
+                // a series: no box and no throw, the series reads the reason and goes to Paused-Error
+                SeriesRefusal = message;
+                AtomSpectraTcpLog.Warn("Session", "Start refused while a series is active: " + message);
+                return false;
+            }
             string name = resultData != null && resultData.DeviceConfig != null ? resultData.DeviceConfig.Name : "unknown";
             if (!AppUi.HasWindows)
             {

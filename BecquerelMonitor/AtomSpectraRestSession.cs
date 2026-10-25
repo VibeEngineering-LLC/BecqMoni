@@ -17,7 +17,9 @@ namespace BecquerelMonitor
         HeadlessBehind,
         DocumentNotEmpty,   // "Start over" is refused in a document that holds data
         HeadlessAsk,        // a stopped board with data and no window to ask in: refused, no -sta
-        ObserveBehind       // observe only, and the board holds less than the document: refused at Start, nothing sent
+        ObserveBehind,      // observe only, and the board holds less than the document: refused at Start, nothing sent
+        SeriesBoardCounting,    // a series never joins an acquisition it did not start
+        SeriesBoardHoldsData    // a series never resumes or erases a stopped measurement it did not start
     }
 
     public sealed class AtomSpectraRestStartQuestion
@@ -73,6 +75,9 @@ namespace BecquerelMonitor
         private readonly object acqLock = new object();   // Detach runs on the UI thread (Stop) and on the poll thread (reset/stall)
 
         public Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice> Ask;
+
+        // #BM-12: this Start belongs to a measurement series (see AtomSpectraTcpSession.SeriesRun)
+        public bool SeriesRun;
         public long DocumentSeconds;
         public long DocumentCounts;
         public int[] DocumentBins;    // the document's channels at Start (null: none); "Continue" needs every one of them on the board
@@ -260,6 +265,22 @@ namespace BecquerelMonitor
 
             AtomSpectraRestStartPlan plan = AtomSpectraRestPolicy.PlanStart(observeOnly, Ask != null, counting, second, DocumentSeconds, DocumentCounts, below >= 0);
 
+            if (SeriesRun)
+            {
+                // a series controls the board itself and never joins, resumes or erases what it did not start (nothing is sent)
+                AtomSpectraRestFailure why = observeOnly ? AtomSpectraRestFailure.ObserveOnly
+                    : counting ? AtomSpectraRestFailure.SeriesBoardCounting
+                    : plan != AtomSpectraRestStartPlan.Restart && second.HasData && DocumentSeconds == 0 && DocumentCounts == 0 ? AtomSpectraRestFailure.SeriesBoardHoldsData
+                    : AtomSpectraRestFailure.None;
+                if (why != AtomSpectraRestFailure.None)
+                {
+                    LastPlan = plan;
+                    Failure = why;
+                    lastError = "a series does not start on this board: " + why;
+                    AtomSpectraTcpLog.Warn("Session", "Start refused for a series: " + why + "; nothing sent");
+                    return AtomSpectraTcpBeginOutcome.Refused;
+                }
+            }
             if (plan == AtomSpectraRestStartPlan.RefuseObserve) plan = ObservePlan(second, below);   // Replace is still possible (nothing sent)
             if (plan == AtomSpectraRestStartPlan.RefuseObserve)
             {

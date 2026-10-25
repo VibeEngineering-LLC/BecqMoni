@@ -231,7 +231,8 @@ namespace BecquerelMonitor
                 if (!ok)
                 {
                     _doc.UpdateSpectrum = false;
-                    error = SeriesText.StartFailed;
+                    string why = SeriesDevices.BoardRefusal(_rd);   // IMPL-6: the board's own reason
+                    error = SeriesText.StartFailed + (why.Length > 0 ? " " + why : "");
                     return false;
                 }
 

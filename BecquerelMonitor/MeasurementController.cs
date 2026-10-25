@@ -702,6 +702,12 @@ namespace BecquerelMonitor
         }
 
         // Token: 0x060006AE RID: 1710 RVA: 0x0002814C File Offset: 0x0002634C
+        // #BM-12: a failed Clear of the device is thrown without windows, and ALSO in a series (the series must stop in Paused-Error, not go on with a spectrum that was not cleared)
+        internal static bool ClearFailureThrows(bool hasWindows, bool seriesActive)
+        {
+            return !hasWindows || seriesActive;
+        }
+
         public void ClearMeasurementResult()
         {
             if (this.deviceController == null)
@@ -718,7 +724,7 @@ namespace BecquerelMonitor
                 // обнулённые отсчёты прибора приедут в следующем же обновлении
                 // (`update_hystogram` копирует НАКОПЛЕННУЮ гистограмму целиком) и
                 // будут посчитаны как свежие. Без окон — отказ.
-                if (!AppUi.HasWindows)
+                if (ClearFailureThrows(AppUi.HasWindows, this.Series != null && this.Series.IsActive))
                 {
                     throw new InvalidOperationException(
                         "BecqMoni: the device refused to clear its accumulated result (" + ex.GetType().Name + "): "

@@ -68,6 +68,13 @@ namespace BecquerelMonitor
         // the offer after a board reset, held while a wait window is open; the recording is judged when it is shown
         internal void ScheduleBoardOffer(string text, string logText, ResultData data, long boardSeconds, long boardCounts, bool recordingAtPost)
         {
+            MeasurementSeries series = data != null && data.MeasurementController != null ? data.MeasurementController.Series : null;
+            if (series != null && (series.IsActive || series.State == SeriesState.PausedError))
+            {
+                // a document in a series is never given the board's new acquisition: only the advice (the series is in Paused-Error)
+                AtomSpectraRestUi.AfterWait(() => ShowOrLog(ResetAdvice(text), logText));
+                return;
+            }
             AtomSpectraRestUi.AfterWait(() => OfferBoardAcquisition(text, logText, data, boardSeconds, boardCounts, RecordingAtShow(data, recordingAtPost)));
         }
 

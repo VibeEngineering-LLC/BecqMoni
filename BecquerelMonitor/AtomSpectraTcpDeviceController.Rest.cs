@@ -121,7 +121,8 @@ namespace BecquerelMonitor
                     // the document's channels: "Continue" is offered only when the board holds at least as much in every one of them
                     rest.DocumentBins = r.EnergySpectrum != null && r.EnergySpectrum.Spectrum != null ? (int[])r.EnergySpectrum.Spectrum.Clone() : null;
                     // asked on the UI thread; a headless run never asks (joins or refuses)
-                    rest.Ask = AppUi.HasWindows ? ReplaceOnlyIfFolds(r, profileChannels, AnswerGiven(r, new Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice>(AtomSpectraRestUi.AskStart))) : null;
+                    rest.SeriesRun = SeriesStrict(r);
+                    rest.Ask = AskAllowed(WindowsForAsk(), SeriesStrict(r)) ? ReplaceOnlyIfFolds(r, profileChannels, AnswerGiven(r, new Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice>(AtomSpectraRestUi.AskStart))) : null;
                     // ?channels=N of the profile at Start (the same number restChannels keeps below)
                     rest.RequestChannels = profileChannels;
                     bool newDoc = newDocumentCreated;
@@ -176,6 +177,12 @@ namespace BecquerelMonitor
                 case AtomSpectraRestFailure.StopRefused:
                 case AtomSpectraRestFailure.ResetRefused:
                     return string.Format(CultureInfo.InvariantCulture, Resources.ERRAtomSpectraRestRestartPartial, rest.LastErrorText ?? Resources.AtomSpectraRestErrNoAnswer);
+                case AtomSpectraRestFailure.ObserveOnly:
+                    return SeriesText.ObserveOnlyUnavailable;
+                case AtomSpectraRestFailure.SeriesBoardCounting:
+                    return SeriesText.BoardCounting;
+                case AtomSpectraRestFailure.SeriesBoardHoldsData:
+                    return SeriesText.BoardNotReady;
                 case AtomSpectraRestFailure.HeadlessBehind:
                     return Resources.ERRAtomSpectraRestHeadlessBehind;
                 case AtomSpectraRestFailure.HeadlessAsk:   // a stopped board with data and no window to ask in
@@ -191,9 +198,15 @@ namespace BecquerelMonitor
 
         private void ClearRest(ResultData r, AtomSpectraTcpDeviceConfig config)
         {
-            if (!AppUi.HasWindows) throw new InvalidOperationException("BecqMoni: AtomSpectra REST Clear needs a confirmation window; the board was not reset.");
+            bool strict = SeriesStrict(r);   // a series clears the board it started itself: no window, no confirmation
+            if (!strict && !AppUi.HasWindows) throw new InvalidOperationException("BecqMoni: AtomSpectra REST Clear needs a confirmation window; the board was not reset.");
             OpenRestSession(config);
             AtomSpectraRestSession rest = session as AtomSpectraRestSession;
+            if (strict)
+            {
+                ClearForSeries(r, rest, config);
+                return;
+            }
             if (rest == null)
             {
                 AppUi.Report(BadUrlText(config), "", MessageBoxIcon.Warning);
@@ -231,6 +244,17 @@ namespace BecquerelMonitor
                 AppUi.Report(string.Format(CultureInfo.InvariantCulture, Resources.MSGAtomSpectraRestNotReset, rest.LastErrorText ?? Resources.AtomSpectraRestErrNoAnswer), "", MessageBoxIcon.Warning);
                 return;
             }
+            r.StartTime = DateTime.Now;
+        }
+
+        // #BM-12: the Clear between two spectra of a series; any failure is thrown, so the series stops in Paused-Error and never believes in a reset that did not happen
+        private void ClearForSeries(ResultData r, AtomSpectraRestSession rest, AtomSpectraTcpDeviceConfig config)
+        {
+            if (rest == null) throw new InvalidOperationException(BadUrlText(config));
+            if (rest.ObserveOnly) throw new InvalidOperationException(SeriesText.ObserveOnlyUnavailable);
+            if (rest.JoinedRunning) throw new InvalidOperationException(SeriesText.BoardCounting);
+            bool ok = AtomSpectraRestUi.RunWithWait(delegate { return rest.ClearNow(CommandTimeoutMs); });
+            if (!ok) throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, Resources.MSGAtomSpectraRestNotReset, rest.LastErrorText ?? Resources.AtomSpectraRestErrNoAnswer));
             r.StartTime = DateTime.Now;
         }
 

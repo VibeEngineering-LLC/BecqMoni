@@ -39,7 +39,10 @@ namespace BecquerelMonitor
         public static string InvalidPreset => T("Для серии нужно время набора больше нуля.", "A series needs an acquisition time greater than zero.");
         public static string ClearFirst => T("Серия начнётся с очистки спектра документа. Продолжить?", "The series will start by clearing the spectrum of the document. Continue?");
         public static string StopQuestion => T("Остановить серию: сохранить текущий неполный спектр?", "Stop the series: save the current incomplete spectrum?");
-        public static string TcpUnavailable => T("Серия для плат TCP/REST пока недоступна.", "A series is not yet available for TCP/REST boards.");
+        public static string BoardCounting => T("Плата уже считает спектр, запущенный не серией. Серия не подключается к чужому набору: остановите набор на плате и запустите серию снова.", "The board is already counting a spectrum that this series did not start. A series never joins someone else's acquisition: stop it on the board and start the series again.");
+        public static string BoardNotReady => T("Плата хранит чужое измерение или её состояние неизвестно. Серия ничего не стирает без спроса: очистите плату кнопкой «Очистить» и запустите серию снова.", "The board holds someone else's measurement, or its state is unknown. A series erases nothing without asking: clear the board with the Clear button and start the series again.");
+        public static string ObserveOnlyUnavailable => T("Серия недоступна в режиме «только наблюдение»: программа не управляет платой. Отключите этот режим в настройках платы.", "A series is not available in the observe-only mode: the program does not control the board. Turn this mode off in the board settings.");
+        public static string ObserveOnlyShort => T("Серия недоступна: режим «только наблюдение»", "Series not available: observe-only mode");
         public static string AttachBlocked => T("Идёт серия измерений: присоединять и отсоединять прибор нельзя. Остановите серию кнопкой «Стоп».", "A measurement series is running: the device cannot be attached or detached. Stop the series with the Stop button.");
         public static string CloseQuestion => T("Идёт серия измерений. Остановить серию и закрыть?", "A measurement series is running. Stop the series and close?");
         public static string LocalWarning(string w)

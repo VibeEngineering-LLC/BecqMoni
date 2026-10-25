@@ -45,7 +45,9 @@ namespace BecquerelMonitor
         StoppedWithData,
         Unknown,        // the bridge did not show the analyzer's state (Silent / Uncertain)
         BehindDocument,
-        ClearPending    // a Clear waits for this Start, but the board holds an acquisition that Clear did not see (counted on, reset since)
+        ClearPending,   // a Clear waits for this Start, but the board holds an acquisition that Clear did not see (counted on, reset since)
+        SeriesBoardCounting,    // a series never joins an acquisition it did not start
+        SeriesBoardHoldsData    // a series never resumes or erases a stopped measurement it did not start
     }
 
     // The board's counters went down without our -rst: the numbers before and after (Channel: the first channel that went down, -1: none).
@@ -96,6 +98,9 @@ namespace BecquerelMonitor
         // null = no window to ask (headless runs, the TCP suite): the REST rules without windows: a counting board is joined
         // (nothing sent), a stopped board with data is refused (HeadlessAsk, nothing sent), an empty board gets -sta only; no reset without an answer.
         public Func<AtomSpectraRestStartQuestion, AtomSpectraRestStartChoice> Ask { get; set; }
+
+        // #BM-12: this Start belongs to a measurement series: no question, no joining of a counting board, no resuming of foreign data
+        public bool SeriesRun { get; set; }
         public const int ProbeMs = 2500;   // the bridge sends a status packet about once a second
         // Two samples this far apart with the same board time = a stopped board; closer ones (or one) tell nothing.
         public const int ProbeSpanMs = 1500;
@@ -429,7 +434,7 @@ namespace BecquerelMonitor
                 }
             }
 
-            if (plan != AtomSpectraRestStartPlan.Join) accepted &= Command("-sta", commandTimeoutMs);   // Join: the board is not touched
+            if (plan != AtomSpectraRestStartPlan.Join) accepted = accepted && Command("-sta", commandTimeoutMs);   // Join: the board is not touched; a failed -sto/-rst never goes on to -sta (the board would resume the old acquisition)
 
             if (!accepted)
             {
@@ -531,6 +536,20 @@ namespace BecquerelMonitor
                 Refusal = holds || Ask != null ? AtomSpectraTcpRefusal.None : AtomSpectraTcpRefusal.ClearPending;
                 AtomSpectraTcpLog.Info("Session", "TCP Start: a Clear waits for it (the board then " + ClearSeenSeconds.ToString(CultureInfo.InvariantCulture) + " s, "
                     + ClearSeenCounts.ToString(CultureInfo.InvariantCulture) + " counts); " + (holds ? "the board still holds that: reset" : "the board holds another acquisition: asked, not reset blind"));
+            }
+            if (SeriesRun)
+            {
+                // a series never joins someone else's acquisition and never resumes or erases a measurement it did not start (nothing is sent)
+                if (BoardState == AtomSpectraTcpBoardState.Counting)
+                {
+                    Refusal = AtomSpectraTcpRefusal.SeriesBoardCounting;
+                    plan = AtomSpectraRestStartPlan.Ask;
+                }
+                else if (plan != AtomSpectraRestStartPlan.Restart && AtomSpectraRestPolicy.BoardHasData(board) && DocumentSeconds == 0 && DocumentCounts == 0)
+                {
+                    Refusal = AtomSpectraTcpRefusal.SeriesBoardHoldsData;
+                    plan = AtomSpectraRestStartPlan.Ask;
+                }
             }
             if (plan == AtomSpectraRestStartPlan.Ask && Ask != null)
             {
