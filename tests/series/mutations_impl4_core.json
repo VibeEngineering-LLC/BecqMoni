@@ -1,0 +1,18 @@
+[
+ {"id": "J01-name-not-shortened", "file": "SeriesSettings.cs",
+  "old": "            name = ShortenName(name, MaxNameLength, n);\n",
+  "new": "",
+  "owner": "Z17", "note": "F4: a long template gives a long file name"},
+ {"id": "J02-path-room-not-checked", "file": "SeriesSettings.cs",
+  "old": "if (room < 16)",
+  "new": "if (false)",
+  "owner": "Z17", "note": "F4: a folder that leaves no room for a name does not refuse"},
+ {"id": "J03-shorten-loses-number", "file": "SeriesSettings.cs",
+  "old": "string tail = \"_\" + n.ToString(CultureInfo.InvariantCulture);",
+  "new": "string tail = \"_\";",
+  "owner": "Z17", "note": "F4: the shortened names of different spectra collide"},
+ {"id": "J04-path-not-shortened", "file": "SeriesSettings.cs",
+  "old": "            name = ShortenName(name, room, n);",
+  "new": "",
+  "owner": "Z17", "note": "F4: the whole path may pass the limit with a long folder"}
+]

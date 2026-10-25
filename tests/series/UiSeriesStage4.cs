@@ -16,7 +16,23 @@ public static class UiStage4
         fails += Check("Z15_close_by_name_asks_series_before_save", Z15);
         fails += Check("Z16_close_active_asks_series_before_save", Z16);
         fails += Check("Z18_start_refuses_long_folder", Z18);
+        fails += Check("Z19_form_refuses_long_folder", Z19);
         return fails;
+    }
+
+    // F4: the settings window refuses a too long folder (its reports go to the error stream in this windowless process)
+    private static void Z19()
+    {
+        Type t = typeof(MainForm).Assembly.GetType("BecquerelMonitor.SeriesSettingsForm");
+        var init = new SeriesSettings { Enabled = true, Count = 5, Folder = @"C:\" + new string('d', 240), Template = "{prefix}_{n}", Prefix = "sp" };
+        object form = Activator.CreateInstance(t, new object[] { init, 600, @"C:\s", "doc" });
+        TextWriter old = Console.Error;
+        var sw = new StringWriter();
+        Console.SetError(sw);
+        try { Call(form, "BtnOk_Click", new object[] { null, EventArgs.Empty }); }
+        finally { Console.SetError(old); }
+        if (t.GetProperty("Result").GetValue(form, null) != null) throw new Exception("the window accepted a too long folder");
+        if (sw.ToString().Length == 0) throw new Exception("no refusal text was reported");
     }
 
     private static int Check(string name, Action action)
