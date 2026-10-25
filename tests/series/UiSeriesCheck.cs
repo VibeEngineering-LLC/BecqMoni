@@ -27,6 +27,7 @@ static class UiSeriesCheck
         fails += UiStage3.Run();
         fails += UiStage4.Run();
         fails += UiStage5.Run();
+        fails += UiStage6.Run();
         Console.WriteLine("SUMMARY fail=" + fails);
         return fails;
     }
