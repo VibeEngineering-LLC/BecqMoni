@@ -25,7 +25,7 @@ public static class UiStage4
     {
         Type t = typeof(MainForm).Assembly.GetType("BecquerelMonitor.SeriesSettingsForm");
         var init = new SeriesSettings { Enabled = true, Count = 5, Folder = @"C:\" + new string('d', 240), Template = "{prefix}_{n}", Prefix = "sp" };
-        object form = Activator.CreateInstance(t, new object[] { init, 600, @"C:\s", "doc" });
+        object form = Activator.CreateInstance(t, new object[] { init, 600, @"C:\s", "doc", true });
         TextWriter old = Console.Error;
         var sw = new StringWriter();
         Console.SetError(sw);

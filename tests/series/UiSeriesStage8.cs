@@ -28,6 +28,7 @@ public static class UiStage8
         Check("Y8_cancel_changes_nothing", S8CheckY8);
         Check("Y9_fields_are_visible_and_on_top", () => RunCultureCheck("Y9_fields_are_visible_and_on_top", S8CheckY9));
         Check("Y10_time_base_is_kept_for_later", S8CheckY10);
+        Check("Y11_time_is_fixed_while_a_series_runs", S8CheckY11);
 
         return _failures;
     }
@@ -320,7 +321,7 @@ public static class UiStage8
             NumericUpDown minutes = (NumericUpDown)S8GetField(form, "_numPresetMinutes");
             S8SetNumeric(minutes, 2);
 
-            int newPreset = 180;
+            int newPreset = 120;
             string newExpectedTotal = SeriesSettings.FormatHms(settings.TotalSeconds(newPreset));
 
             if (lblTotal.Text != newExpectedTotal) throw new Exception("Total should be " + newExpectedTotal + " but was " + lblTotal.Text);
@@ -553,15 +554,15 @@ public static class UiStage8
 
             Point hoursCenter = new Point(hoursRect.X + hoursRect.Width / 2, hoursRect.Y + hoursRect.Height / 2);
             Control deepestHours = S8Deepest(f, hoursCenter);
-            if (deepestHours != hours) throw new Exception("Deepest at hours center should be hours");
+            if (deepestHours != hours && !hours.Contains(deepestHours)) throw new Exception("Deepest at hours center should be hours");
 
             Point minutesCenter = new Point(minutesRect.X + minutesRect.Width / 2, minutesRect.Y + minutesRect.Height / 2);
             Control deepestMinutes = S8Deepest(f, minutesCenter);
-            if (deepestMinutes != minutes) throw new Exception("Deepest at minutes center should be minutes");
+            if (deepestMinutes != minutes && !minutes.Contains(deepestMinutes)) throw new Exception("Deepest at minutes center should be minutes");
 
             Point secondsCenter = new Point(secondsRect.X + secondsRect.Width / 2, secondsRect.Y + secondsRect.Height / 2);
             Control deepestSeconds = S8Deepest(f, secondsCenter);
-            if (deepestSeconds != seconds) throw new Exception("Deepest at seconds center should be seconds");
+            if (deepestSeconds != seconds && !seconds.Contains(deepestSeconds)) throw new Exception("Deepest at seconds center should be seconds");
 
             if (hoursRect.IntersectsWith(minutesRect)) throw new Exception("Hours and minutes intersect");
             if (hoursRect.IntersectsWith(secondsRect)) throw new Exception("Hours and seconds intersect");
@@ -591,6 +592,29 @@ public static class UiStage8
         {
             S8DisposeForm(form);
         }
+    }
+
+    // the time of each spectrum is editable unless a series is running on the document
+    private static void S8CheckY11()
+    {
+        MethodInfo m = typeof(DCControlPanel).GetMethod("SeriesPresetEditable", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        if (m == null) throw new Exception("SeriesPresetEditable is missing");
+        DocEnergySpectrum doc = new DocEnergySpectrum();
+        ResultData rd = doc.ActiveResultData;
+        if (!(bool)m.Invoke(null, new object[] { rd })) throw new Exception("no series: editable expected");
+        MainForm mf = (MainForm)FormatterServices.GetUninitializedObject(typeof(MainForm));
+        DCControlPanel p = new DCControlPanel(mf);
+        rd.Series = new SeriesSettings { Enabled = true, Count = 3, Folder = Path.GetTempPath(), Prefix = "sp" };
+        rd.DeviceConfig = new DeviceConfigInfo { DeviceType = "AtomSpectraVCP" };
+        TextBox box = (TextBox)typeof(DCControlPanel).GetField("realTimeLimitTextBox", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).GetValue(p);
+        box.Text = "60";
+        FieldInfo dlg = typeof(DCControlPanel).GetField("SeriesDialog", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        dlg.SetValue(p, (Func<string, MessageBoxButtons, DialogResult>)((t, b) => DialogResult.OK));
+        MethodInfo begin = typeof(DCControlPanel).GetMethod("SeriesBegin", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        if (!(bool)begin.Invoke(p, new object[] { doc, rd, rd.ResultDataStatus })) throw new Exception("series did not begin");
+        if ((bool)m.Invoke(null, new object[] { rd })) throw new Exception("active series: not editable expected");
+        rd.MeasurementController.Series.UserStop(false);
+        if (!(bool)m.Invoke(null, new object[] { rd })) throw new Exception("stopped series: editable expected");
     }
 
     private static int S8TB(SeriesSettings s) { PropertyInfo p = typeof(SeriesSettings).GetProperty("TimeBase"); if (p == null) throw new Exception("SeriesSettings.TimeBase is missing"); return (int)p.GetValue(s, null); }

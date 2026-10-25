@@ -44,6 +44,9 @@ namespace BecquerelMonitor
         {
         }
 
+        /// <summary>The time base of the acquisition time of each spectrum: 0 = real (wall-clock) time, the only one now. Kept in the document so that another base can be added later without breaking old documents (absent = 0).</summary>
+        public int TimeBase { get; set; }
+
         /// <summary>Creates a memberwise copy of this instance.</summary>
         /// <returns>A new instance with the same property values.</returns>
         public SeriesSettings Clone()
@@ -60,7 +63,8 @@ namespace BecquerelMonitor
                 NoOverwrite = this.NoOverwrite,
                 StartKind = this.StartKind,
                 StartAt = this.StartAt,
-                StartInSeconds = this.StartInSeconds
+                StartInSeconds = this.StartInSeconds,
+                TimeBase = this.TimeBase
             };
         }
 

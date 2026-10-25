@@ -187,21 +187,41 @@ namespace BecquerelMonitor
 
             SeriesSettings initial = rd.Series != null ? rd.Series : new SeriesSettings();
             int presetSeconds = Math.Max(0, this.PresetTime);
+            bool editable = SeriesPresetEditable(rd);   // IMPL-7: the time of each spectrum is fixed while a series runs
 
-            using (SeriesSettingsForm form = new SeriesSettingsForm(initial, presetSeconds, folderOfDoc, nameOfDoc))
+            using (SeriesSettingsForm form = new SeriesSettingsForm(initial, presetSeconds, folderOfDoc, nameOfDoc, editable))
             {
-                if (form.ShowDialog(this) == DialogResult.OK)
+                if (form.ShowDialog(this) == DialogResult.OK)   // modal: the panel cannot change while the window is open
                 {
-                    SeriesSettings r = form.Result;
-                    if (r != null)
-                    {
-                        r.Enabled = seriesCheck.Checked;
-                        rd.Series = r;
-                        doc.Dirty = true;
-                        RefreshSeriesSummary();
-                    }
+                    this.ApplySeriesForm(doc, rd, form);
                 }
             }
+        }
+
+        /// <summary>IMPL-7: the time of each spectrum cannot be changed while a series runs on the document.</summary>
+        internal static bool SeriesPresetEditable(ResultData rd)
+        {
+            MeasurementSeries running = rd != null && rd.MeasurementController != null ? rd.MeasurementController.Series : null;
+            return running == null || !running.IsActive;
+        }
+
+        /// <summary>The window was accepted: the series settings and the ONE time of each spectrum (the panel's real-time field, through the same path as typing it there).</summary>
+        internal void ApplySeriesForm(DocEnergySpectrum doc, ResultData rd, SeriesSettingsForm form)
+        {
+            SeriesSettings r = form.Result;
+            if (r == null)
+            {
+                return;
+            }
+            r.Enabled = seriesCheck.Checked;
+            rd.Series = r;
+            doc.Dirty = true;
+            if (form.PresetEditable && form.PresetSeconds != this.PresetTime)
+            {
+                this.PresetTime = form.PresetSeconds;
+                this.PresetTimeChanged();
+            }
+            RefreshSeriesSummary();
         }
 
         private void OnSeriesSkipClicked()

@@ -640,7 +640,7 @@ public static class UiStage3
                 NoOverwrite = false
             };
 
-            object form1 = Activator.CreateInstance(formType, new object[] { settings1, 600, @"C:\s", "doc" });
+            object form1 = Activator.CreateInstance(formType, new object[] { settings1, 600, @"C:\s", "doc", true });
 
             // Check for WarnAsk seam
             FieldInfo warnAskField = formType.GetField("WarnAsk", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
@@ -676,7 +676,7 @@ public static class UiStage3
                 NoOverwrite = true
             };
 
-            object form2 = Activator.CreateInstance(formType, new object[] { settings2, 600, @"C:\s", "doc" });
+            object form2 = Activator.CreateInstance(formType, new object[] { settings2, 600, @"C:\s", "doc", true });
 
             int warnCalls2 = 0;
             Func<string, bool> warnAsk2 = (text) =>
@@ -702,7 +702,7 @@ public static class UiStage3
             bool ok2 = result2 == null && warnCalls2 == 1;
 
             // Part 2b: WarnAsk returns true
-            object form2b = Activator.CreateInstance(formType, new object[] { settings2, 600, @"C:\s", "doc" });
+            object form2b = Activator.CreateInstance(formType, new object[] { settings2, 600, @"C:\s", "doc", true });
 
             int warnCalls2b = 0;
             Func<string, bool> warnAsk2b = (text) =>
@@ -747,7 +747,7 @@ public static class UiStage3
                 NoOverwrite = false
             };
 
-            object form3 = Activator.CreateInstance(formType, new object[] { settings3, 600, @"C:\s", "doc" });
+            object form3 = Activator.CreateInstance(formType, new object[] { settings3, 600, @"C:\s", "doc", true });
 
             int warnCalls3 = 0;
             Func<string, bool> warnAsk3 = (text) =>

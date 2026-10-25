@@ -17,7 +17,8 @@ namespace BecquerelMonitor
         public static string SkipDelay => T("Пропустить паузу", "Skip pause");
         public static string FormTitle => T("Серия измерений", "Measurement series");
         public static string LblCount => T("Количество спектров (0 = бесконечно):", "Number of spectra (0 = endless):");
-        public static string LblTime => T("Время набора каждого:", "Acquisition time of each:");
+        public static string LblTime => T("Время набора каждого спектра (реальное время):", "Acquisition time of each spectrum (real time):");
+        public static string ErrPreset => T("Время набора каждого спектра должно быть не меньше одной секунды.", "The acquisition time of each spectrum must be at least one second.");
         public static string LblDelay => T("Пауза между спектрами:", "Pause between spectra:");
         public static string LblHours => T("ч", "h");
         public static string LblMinutes => T("мин", "min");
