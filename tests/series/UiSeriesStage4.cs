@@ -270,7 +270,7 @@ public static class UiStage4
             Prefix = "sp",
             NoOverwrite = noOverwrite
         };
-        rd.DeviceConfig = new DeviceConfigInfo { DeviceType = "AudioInput" };
+        rd.DeviceConfig = new DeviceConfigInfo { DeviceType = "AtomSpectraVCP" };
         rd.ResultDataStatus.ElapsedTime = TimeSpan.Zero;
         return rd;
     }

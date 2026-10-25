@@ -15,7 +15,7 @@ for m in json.loads((W / sys.argv[1]).read_text(encoding="utf-8")):
     try:
         rc, o = sh([MS + r"\MSBuild.exe", str(P / "BecquerelMonitor.csproj"), "-p:Configuration=Release", "-p:OutputPath=" + str(OUT) + "\\", "-nologo", "-v:q", "-restore", "-p:SignManifests=false", "-p:GenerateManifests=false"])
         if rc: print("MUT", m["id"], "BUILDERR", o[-300:].replace("\n", " ")); continue
-        rc, o = sh([MS + r"\Roslyn\csc.exe", "-nologo", "-r:BecquerelMonitor.exe", "-r:WeifenLuo.WinFormsUI.Docking.dll", "-r:System.Windows.Forms.dll", "-r:System.Drawing.dll", "-out:UiCheck.exe", str(W / "UiSeriesCheck.cs"), str(W / "UiSeriesStage2.cs"), str(W / "UiSeriesStage3.cs"), str(W / "UiSeriesStage4.cs")], cwd=OUT)
+        rc, o = sh([MS + r"\Roslyn\csc.exe", "-nologo", "-r:BecquerelMonitor.exe", "-r:WeifenLuo.WinFormsUI.Docking.dll", "-r:System.Windows.Forms.dll", "-r:System.Drawing.dll", "-out:UiCheck.exe", str(W / "UiSeriesCheck.cs"), str(W / "UiSeriesStage2.cs"), str(W / "UiSeriesStage3.cs"), str(W / "UiSeriesStage4.cs"), str(W / "UiSeriesStage5.cs")], cwd=OUT)
         rc, o = sh([sys.executable, str(W.parents[1] / "tools" / "run_hidden_desktop.py"), "--timeout", "150", "--cwd", str(OUT), "--", str(OUT / "UiCheck.exe")])   # NEVER on the operator desktop
         red = [l.split()[1].rstrip(":") for l in o.splitlines() if l.startswith("FAIL ")]
         print("MUT", m["id"], "KILLED" if red else "SURVIVED", "red=" + ",".join(red), "|", m["note"], flush=True)

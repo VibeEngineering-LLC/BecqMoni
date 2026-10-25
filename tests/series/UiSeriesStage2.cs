@@ -63,7 +63,7 @@ public static class UiStage2
             rd1.Series = new SeriesSettings { Enabled = true, Count = 3, Folder = @"C:\s", Prefix = "sp" };
             SetProp(rd1.Series, "StartKind", 1);
             SetProp(rd1.Series, "StartAt", DateTime.Now.AddHours(-1));
-            rd1.DeviceConfig = new DeviceConfigInfo { DeviceType = "AudioInput" };
+            rd1.DeviceConfig = new DeviceConfigInfo { DeviceType = "AtomSpectraVCP" };
             rd1.ResultDataStatus.ElapsedTime = TimeSpan.Zero;
 
             int dialogCalls1 = 0;
@@ -80,7 +80,7 @@ public static class UiStage2
             rd2.Series = new SeriesSettings { Enabled = true, Count = 3, Folder = @"C:\s", Prefix = "sp" };
             SetProp(rd2.Series, "StartKind", 1);
             SetProp(rd2.Series, "StartAt", DateTime.Now.AddHours(-1));
-            rd2.DeviceConfig = new DeviceConfigInfo { DeviceType = "AudioInput" };
+            rd2.DeviceConfig = new DeviceConfigInfo { DeviceType = "AtomSpectraVCP" };
             rd2.ResultDataStatus.ElapsedTime = TimeSpan.Zero;
 
             int dialogCalls2 = 0;
@@ -101,7 +101,7 @@ public static class UiStage2
             rd.Series = new SeriesSettings { Enabled = true, Count = 3, Folder = @"C:\s", Prefix = "sp" };
             SetProp(rd.Series, "StartKind", 2);
             SetProp(rd.Series, "StartInSeconds", 3600);
-            rd.DeviceConfig = new DeviceConfigInfo { DeviceType = "AudioInput" };
+            rd.DeviceConfig = new DeviceConfigInfo { DeviceType = "AtomSpectraVCP" };
             rd.ResultDataStatus.ElapsedTime = TimeSpan.Zero;
 
             int dialogCalls = 0;

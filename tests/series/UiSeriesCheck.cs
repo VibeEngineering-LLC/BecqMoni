@@ -26,6 +26,7 @@ static class UiSeriesCheck
         fails += UiStage2.Run();
         fails += UiStage3.Run();
         fails += UiStage4.Run();
+        fails += UiStage5.Run();
         Console.WriteLine("SUMMARY fail=" + fails);
         return fails;
     }
@@ -265,11 +266,11 @@ static class UiSeriesCheck
         if (capturedText == null || !capturedText.Contains("TCP/REST")) throw new Exception("Captured text does not contain TCP/REST: " + capturedText);
         if (rd.MeasurementController.Series != null) throw new Exception("Series should be null");
 
-        rd.DeviceConfig = new DeviceConfigInfo { DeviceType = "AudioInput" };
+        rd.DeviceConfig = new DeviceConfigInfo { DeviceType = "AtomSpectraVCP" };
         capturedText = "";
         object res2 = mi.Invoke(panel, new object[] { doc, rd, rd.ResultDataStatus });
-        if (!(bool)res2) throw new Exception("SeriesBegin should return true for AudioInput");
-        if (capturedText != "") throw new Exception("Dialog text should be empty for AudioInput");
+        if (!(bool)res2) throw new Exception("SeriesBegin should return true for AtomSpectraVCP");
+        if (capturedText != "") throw new Exception("Dialog text should be empty for AtomSpectraVCP");
         if (rd.MeasurementController.Series == null) throw new Exception("Series should not be null");
         rd.MeasurementController.Series.UserStop(false);
     }
