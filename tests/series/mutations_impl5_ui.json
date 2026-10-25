@@ -46,5 +46,21 @@
  {"id": "K12-no-explanation-on-panel", "file": "DCControlPanel.Series.cs",
   "old": "(supported ? \"\" : SeriesText.DeviceNotSupportedShort)",
   "new": "\"\"",
-  "note": "the panel does not say why the series is unavailable"}
+  "note": "the panel does not say why the series is unavailable"},
+ {"id": "L01-strip-back-behind-the-group", "file": "DCControlPanel.Series.cs",
+  "old": "seriesCheck.Location = new Point(12, 138);",
+  "new": "seriesCheck.Location = new Point(12, 288);",
+  "note": "layout: the check box is back at the old place (inside and behind the counters group)"},
+ {"id": "L02-group-not-moved-down", "file": "DCControlPanel.Series.cs",
+  "old": "this.groupBox1.Top += 71;",
+  "new": "",
+  "note": "layout: the counters group is not moved, it overlaps the strip"},
+ {"id": "L03-status-below-the-fold", "file": "DCControlPanel.Series.cs",
+  "old": "seriesStatusLbl.Location = new Point(12, 180);",
+  "new": "seriesStatusLbl.Location = new Point(12, 400);",
+  "note": "layout: the status line is outside the visible client area"},
+ {"id": "L05-summary-left-out-of-client", "file": "DCControlPanel.Series.cs",
+  "old": "seriesSummaryLbl.Location = new Point(12, 162);",
+  "new": "seriesSummaryLbl.Location = new Point(-30, 162);",
+  "note": "layout: the summary line starts left of the client area"}
 ]

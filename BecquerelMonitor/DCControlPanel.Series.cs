@@ -42,26 +42,26 @@ namespace BecquerelMonitor
             seriesCheck = new CheckBox();
             seriesCheck.Text = SeriesText.Series;
             seriesCheck.AutoSize = true;
-            seriesCheck.Location = new Point(12, 288);
+            seriesCheck.Location = new Point(12, 138);
 
             seriesSetupBtn = new Button();
             seriesSetupBtn.Text = SeriesText.Setup;
-            seriesSetupBtn.Location = new Point(95, 284);
+            seriesSetupBtn.Location = new Point(95, 134);
             seriesSetupBtn.Size = new Size(90, 24);
 
             seriesSkipBtn = new Button();
             seriesSkipBtn.Text = SeriesText.SkipDelay;
-            seriesSkipBtn.Location = new Point(192, 284);
+            seriesSkipBtn.Location = new Point(192, 134);
             seriesSkipBtn.Size = new Size(130, 24);
             seriesSkipBtn.Visible = false;
 
             seriesSummaryLbl = new Label();
-            seriesSummaryLbl.Location = new Point(12, 314);
+            seriesSummaryLbl.Location = new Point(12, 162);
             seriesSummaryLbl.Size = new Size(414, 16);
             seriesSummaryLbl.AutoEllipsis = true;
 
             seriesStatusLbl = new Label();
-            seriesStatusLbl.Location = new Point(12, 332);
+            seriesStatusLbl.Location = new Point(12, 180);
             seriesStatusLbl.Size = new Size(414, 16);
             seriesStatusLbl.AutoEllipsis = true;
 
@@ -70,9 +70,14 @@ namespace BecquerelMonitor
             this.Controls.Add(seriesSkipBtn);
             this.Controls.Add(seriesSummaryLbl);
             this.Controls.Add(seriesStatusLbl);
+            this.groupBox1.Top += 71;   // the strip sits between the device rows and the counters group (before it lay inside and BEHIND the group: invisible)
+            foreach (Control c in new Control[] { seriesCheck, seriesSetupBtn, seriesSkipBtn, seriesSummaryLbl, seriesStatusLbl })
+            {
+                c.BringToFront();   // never under the designer controls
+            }
 
             this.AutoScroll = true;
-            this.AutoScrollMinSize = new Size(437, 356);
+            this.AutoScrollMinSize = new Size(437, 423);
 
             seriesCheck.CheckedChanged += (s, e) =>
             {
