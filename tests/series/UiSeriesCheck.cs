@@ -287,6 +287,7 @@ static class UiSeriesCheck
 
         DocEnergySpectrum docB = new DocEnergySpectrum();
         ResultData rdB = docB.ActiveResultData;
+        rdB.DeviceConfig = new DeviceConfigInfo { DeviceType = "AtomSpectraVCP" };   // IMPL-5: the panel shows a "not available" text for other device types
 
         MainForm mf = (MainForm)FormatterServices.GetUninitializedObject(typeof(MainForm));
         DCControlPanel panel = new DCControlPanel(mf);

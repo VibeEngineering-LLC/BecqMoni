@@ -306,6 +306,11 @@ namespace BecquerelMonitor
                 return true;
             }
 
+            if (!SeriesDevices.IsAllowed(rd.DeviceConfig != null ? rd.DeviceConfig.DeviceType : null))   // IMPL-5: a white list of device types
+            {
+                this.SeriesAsk(SeriesText.DeviceNotSupported, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
             if (rd.DeviceConfig != null && rd.DeviceConfig.DeviceType == AtomSpectraTcpDeviceConfig.DeviceTypeId)
             {
                 // the board asks its own questions on every reset/start and may stay unreset: a series without a person is not safe there yet
@@ -493,6 +498,7 @@ namespace BecquerelMonitor
 
                 if (rd != null)
                 {
+                    bool supported = SeriesDevices.IsAllowed(rd.DeviceConfig != null ? rd.DeviceConfig.DeviceType : null);   // IMPL-5: the controls follow the device type
                     bool enabled = rd.Series != null && rd.Series.Enabled;
                     seriesCheck.Checked = enabled;
                     MeasurementSeries s = rd.MeasurementController != null ? rd.MeasurementController.Series : null;
@@ -508,7 +514,7 @@ namespace BecquerelMonitor
                         seriesSummaryLbl.Text = "";
                     }
 
-                    string statusText = s != null ? SeriesText.Status(s) : "";
+                    string statusText = s != null ? SeriesText.Status(s) : (supported ? "" : SeriesText.DeviceNotSupportedShort);
                     seriesStatusLbl.Text = statusText;
 
                     bool isError = s != null && s.State == SeriesState.PausedError;
@@ -530,8 +536,8 @@ namespace BecquerelMonitor
                     else
                     {
                         attachBtn.Enabled = true;
-                        seriesCheck.Enabled = true;
-                        seriesSetupBtn.Enabled = true;
+                        seriesCheck.Enabled = supported;
+                        seriesSetupBtn.Enabled = supported;
                     }
                 }
             }
