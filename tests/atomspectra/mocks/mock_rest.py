@@ -29,6 +29,8 @@ RENDER_COUNT = 0
 
 CASES = []      # --cases, (status, body, content type) per GET /api/spectrum.json
 CASE_I = [0]
+COUNTS = {"reset": 0, "sta": 0}   # BM-12 series: how many /api/reset and "-sta" requests came (the --*-fail-nth options)
+DOWN_UNTIL = [0.0]   # GET /__down?ms=N : the board refuses every request until this time.monotonic() value
 OPEN = [0]     # connections the mock holds open right now (GET /__open), for the close-before-repeat tests
 
 def elapsed():
@@ -323,6 +325,13 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(raw)
             return
+        if path == "/__down":
+            # BM-12 series: a link loss on demand; not logged
+            DOWN_UNTIL[0] = time.monotonic() + int(parse_qs(parts.query).get("ms", ["0"])[0]) / 1000.0
+            self.send_response(204)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         query = parse_qs(parts.query)
         
         body_text = ""
@@ -355,7 +364,7 @@ class Handler(BaseHTTPRequestHandler):
                 time.sleep(args.hang_from + args.hang_for - e)
                 self.send(503, b'{"error":"late"}')
             # 1. Down window
-            elif args.down_from >= 0 and args.down_from <= e < args.down_from + args.down_for:
+            elif (args.down_from >= 0 and args.down_from <= e < args.down_from + args.down_for) or time.monotonic() < DOWN_UNTIL[0]:
                 if args.down_mode == "refuse":
                     # In refuse mode, we close the connection without sending a response.
                     # The main loop handles the socket shutdown, but for this specific request,
@@ -467,6 +476,10 @@ class Handler(BaseHTTPRequestHandler):
                         late = False
                         with LOCK:
                             if cmd.startswith("-sta"):
+                                COUNTS["sta"] += 1
+                                if args.sta_fail_nth and COUNTS["sta"] == args.sta_fail_nth:
+                                    self.send(200, b'{"ok":false}')
+                                    return
                                 S["counting"] = True
                                 parts = cmd.split()
                                 if args.sta_limit and len(parts) > 1 and parts[1].isdigit():
@@ -495,7 +508,7 @@ class Handler(BaseHTTPRequestHandler):
                         time.sleep(args.reset_delay_ms / 1000.0)   # the reset request is in flight while polling goes on
                     if self.headers.get("X-CSRF-Token") != TOKEN:
                         self.send(403, b"Bad or missing CSRF token", "text/plain")
-                    elif args.reset_fail:
+                    elif args.reset_fail or (args.reset_fail_nth and COUNTS.__setitem__("reset", COUNTS["reset"] + 1) is None and COUNTS["reset"] == args.reset_fail_nth):
                         self.send(500, b"reset failed", "text/plain")
                     else:
                         if args.reset_unsent:
@@ -571,6 +584,8 @@ def main():
     parser.add_argument("--hist-reset-at", type=float, default=-1)
     parser.add_argument("--cmd-no-text", action="store_true")   # the analyzer gives no text answer (nothing reaches the board log)
     parser.add_argument("--cases", type=str, default="")   # comma list of fixtures/responses files
+    parser.add_argument("--reset-fail-nth", type=int, default=0)   # BM-12 series: the N-th /api/reset answers 500 and resets nothing
+    parser.add_argument("--sta-fail-nth", type=int, default=0)   # BM-12 series: the N-th "-sta" answers {"ok":false} and starts nothing
     parser.add_argument("--sta-limit", action="store_true")   # PR37 fix, REST: "-sta N" stops the board after N s (the board's own limit)
     args = parser.parse_args()
 

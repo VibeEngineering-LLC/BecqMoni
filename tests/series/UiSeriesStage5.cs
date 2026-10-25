@@ -12,7 +12,7 @@ public static class UiStage5
         int failures = 0;
         failures += Check("Z20_atomspectra_vcp_is_allowed", Z20);
         failures += Check("Z21_other_types_are_refused", Z21);
-        failures += Check("Z22_tcp_boards_keep_their_own_refusal", Z22);
+        failures += Check("Z22_tcp_and_rest_boards_are_allowed", Z22);
         failures += Check("Z23_panel_controls_follow_the_device", Z23);
         failures += Check("Z24_every_known_type_has_a_decision", Z24);
         return failures;
@@ -108,11 +108,10 @@ public static class UiStage5
         });
 
         bool ok = CallSeriesBegin(panel, doc, rd);
-        if (ok) throw new Exception("SeriesBegin returned true for TCP " + transport);
-        if (rd.MeasurementController.Series != null) throw new Exception("Series is not null for TCP " + transport);
-        if (dialogCalls != 1) throw new Exception("Dialog called " + dialogCalls + " times for TCP " + transport);
-        if (string.IsNullOrEmpty(capturedText) || !capturedText.Contains("TCP/REST"))
-            throw new Exception("Text does not contain TCP/REST for " + transport);
+        if (!ok) throw new Exception("SeriesBegin returned false for TCP " + transport + " (IMPL-6: boards are allowed)");
+        if (rd.MeasurementController.Series == null) throw new Exception("Series is null for TCP " + transport);
+        if (dialogCalls != 0) throw new Exception("Dialog called " + dialogCalls + " times for TCP " + transport + ": " + capturedText);
+        rd.MeasurementController.Series.UserStop(false);
     }
 
     private static void Z23()

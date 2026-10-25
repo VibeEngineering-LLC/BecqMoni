@@ -21,13 +21,14 @@ static class UiSeriesCheck
         fails += RunCheck("U3_stop_path_stops_series", U3);
         fails += RunCheck("U4_stale_stop_answer", U4);
         fails += RunCheck("U5_attach_detach_refused_in_series", U5);
-        fails += RunCheck("U6_tcp_board_refused", U6);
+        fails += RunCheck("U6_tcp_board_allowed", U6);
         fails += RunCheck("U7_tab_switch_panel_follows_document", U7);
         fails += UiStage2.Run();
         fails += UiStage3.Run();
         fails += UiStage4.Run();
         fails += UiStage5.Run();
         fails += UiStage6.Run();
+        fails += UiStage7.Run();
         Console.WriteLine("SUMMARY fail=" + fails);
         return fails;
     }
@@ -263,9 +264,11 @@ static class UiSeriesCheck
         MethodInfo mi = typeof(DCControlPanel).GetMethod("SeriesBegin", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         if (mi == null) throw new Exception("SeriesBegin not found");
         object res = mi.Invoke(panel, new object[] { doc, rd, rd.ResultDataStatus });
-        if ((bool)res) throw new Exception("SeriesBegin should return false for TCP/REST");
-        if (capturedText == null || !capturedText.Contains("TCP/REST")) throw new Exception("Captured text does not contain TCP/REST: " + capturedText);
-        if (rd.MeasurementController.Series != null) throw new Exception("Series should be null");
+        if (!(bool)res) throw new Exception("SeriesBegin should return true for a TCP board (IMPL-6: the series runs on boards now)");
+        if (capturedText != "") throw new Exception("No dialog expected for a TCP board: " + capturedText);
+        if (rd.MeasurementController.Series == null) throw new Exception("Series should not be null");
+        rd.MeasurementController.Series.UserStop(false);
+        rd.MeasurementController.Series = null;
 
         rd.DeviceConfig = new DeviceConfigInfo { DeviceType = "AtomSpectraVCP" };
         capturedText = "";

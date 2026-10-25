@@ -126,7 +126,7 @@ public static class UiStage2
             if (rd.MeasurementController.Series.State != SeriesState.Idle) throw new Exception("State is " + rd.MeasurementController.Series.State);
         });
 
-        fails += Check("V5_tcp_board_still_refused_with_wait", () =>
+        fails += Check("V5_tcp_board_waits_for_the_delayed_start", () =>
         {
             var doc = new DocEnergySpectrum();
             var rd = doc.ActiveResultData;
@@ -139,9 +139,10 @@ public static class UiStage2
             var panel = NewPanel((msg, buttons) => { capturedText = msg; return DialogResult.OK; });
 
             bool ret = (bool)Invoke(panel, "SeriesBegin", new object[] { doc, rd, rd.ResultDataStatus });
-            if (ret) throw new Exception("Expected false");
-            if (capturedText == null || !capturedText.Contains("TCP/REST")) throw new Exception("Text does not contain TCP/REST: " + capturedText);
-            if (rd.MeasurementController.Series != null) throw new Exception("Series is not null");
+            if (ret) throw new Exception("Expected false (the series waits for its start)");
+            if (capturedText != "") throw new Exception("No refusal expected for a TCP board: " + capturedText);
+            if (rd.MeasurementController.Series == null || rd.MeasurementController.Series.State != SeriesState.Waiting) throw new Exception("The series should be Waiting");
+            rd.MeasurementController.Series.UserStop(false);
         });
 
         return fails;

@@ -465,7 +465,7 @@ public static class UiStage3
                 DeviceType = AtomSpectraTcpDeviceConfig.DeviceTypeId,
                 InputDeviceConfig = new AtomSpectraTcpDeviceConfig
                 {
-                    Transport = AtomSpectraTransport.Rest
+                    Transport = AtomSpectraTransport.Rest, RestObserveOnly = true
                 }
             };
 
@@ -490,23 +490,23 @@ public static class UiStage3
             bool returnedFalse = (result is bool) && !(bool)result;
 
             bool ok = returnedFalse
-                && capturedText.Contains("TCP/REST")
+                && (capturedText.Contains("наблюдени") || capturedText.ToLowerInvariant().Contains("observe"))
                 && rd.MeasurementController.Series == null;
 
             if (ok)
             {
-                Console.WriteLine("PASS Z8_rest_board_refused");
+                Console.WriteLine("PASS Z8_rest_observe_only_refused");
                 return 0;
             }
             else
             {
-                Console.WriteLine("FAIL Z8_rest_board_refused: ret=" + result + " text=" + capturedText + " series=" + (rd.MeasurementController.Series == null ? "null" : "not null"));
+                Console.WriteLine("FAIL Z8_rest_observe_only_refused: ret=" + result + " text=" + capturedText + " series=" + (rd.MeasurementController.Series == null ? "null" : "not null"));
                 return 1;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine("FAIL Z8_rest_board_refused: " + ex.GetType().Name + ": " + ex.Message);
+            Console.WriteLine("FAIL Z8_rest_observe_only_refused: " + ex.GetType().Name + ": " + ex.Message);
             return 1;
         }
     }
@@ -877,7 +877,7 @@ public static class UiStage3
                 DeviceType = AtomSpectraTcpDeviceConfig.DeviceTypeId,
                 InputDeviceConfig = new AtomSpectraTcpDeviceConfig
                 {
-                    Transport = AtomSpectraTransport.Rest
+                    Transport = AtomSpectraTransport.Rest, RestObserveOnly = true
                 }
             };
 
@@ -920,7 +920,7 @@ public static class UiStage3
             }
             else
             {
-                if (!capturedC.Contains("TCP/REST"))
+                if (!(capturedC.Contains("наблюдени") || capturedC.ToLowerInvariant().Contains("observe")))
                 {
                     okC = false;
                 }
