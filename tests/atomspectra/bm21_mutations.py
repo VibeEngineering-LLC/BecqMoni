@@ -15,3 +15,20 @@ MUTATIONS = [
     ("bm21-block-start", "the Start is refused on a firmware below 1.2.39 instead of a warning",
      [(SES, "lastProbe = second;", "if (AtomSpectraFirmware.IsBelowRecommended(" + READ + ") == true) { Failure = AtomSpectraRestFailure.Unreachable; return AtomSpectraTcpBeginOutcome.ConnectFailed; }\n            lastProbe = second;")], "bm21-start-ok-low", True),
 ]
+MUTATIONS.append(("bm21-long-uncut", "the version is put into the hint without a length limit",
+     [(FW, "if (shown.Length > MaxShownVersion)", "if (false)")], "bm21-long", True))
+
+# the controller (real build only, rest_suite.REAL_MUTATIONS): (id, description, [(file, old, new)], the scenario that must be red)
+CTL = "AtomSpectraTcpDeviceController.cs"
+CTLR = "AtomSpectraTcpDeviceController.Rest.cs"
+OPEN = "string ue0; boardFirmware = AtomSpectraFirmware.ReadVersion(config.CreateRestClient(out ue0), AtomSpectraRestSession.FirmwareReadMs);"
+REAL = [
+    ("bm21-tcp-no-hint", "the TCP refusal does not carry the firmware hint",
+     [(CTL, "AppendWarning(refusal, boardFirmware)", "AppendWarning(refusal, null)")], "bm21-ctl-connfail"),
+    ("bm21-tcp-read-on-success", "the TCP Start reads the board status also when it succeeds",
+     [(CTL, 'info = QueryQuietly(s, "-inf");', 'info = QueryQuietly(s, "-inf"); ' + OPEN)], "bm21-ctl-ok"),
+    ("bm21-rest-status-hint", "the status line of a successful REST Start carries the firmware hint",
+     [(CTLR, 'AtomSpectraTcpLog.SetStatus("REST", rest.Endpoint, rest.ObserveOnly ? Resources.AtomSpectraRestStatusObserving',
+       'string ue1; AtomSpectraTcpLog.SetStatus("REST", rest.Endpoint, AtomSpectraFirmware.AppendWarning(rest.ObserveOnly ? Resources.AtomSpectraRestStatusObserving'),
+      (CTLR, ': Resources.AtomSpectraRestStatusMeasuring));', ': Resources.AtomSpectraRestStatusMeasuring), AtomSpectraFirmware.ReadVersion(config.CreateRestClient(out ue1), AtomSpectraRestSession.FirmwareReadMs)));')], "bm21-ctl-rest-ok"),
+]

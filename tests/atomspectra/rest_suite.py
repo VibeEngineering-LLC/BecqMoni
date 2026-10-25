@@ -350,6 +350,11 @@ SCENARIOS = [
     ("bm21-start-fail-unknown", ["--fw-version", "?", "--fail-from", "0", "--fail-status", "503"]),
     ("bm21-test-low", ["--fw-version", "1.2.38", "--counting", "0", "--time", "5000", "--total", "1000"]),
     ("bm21-test-new", ["--fw-version", "1.2.39-t1b", "--counting", "0", "--time", "5000", "--total", "1000"]),
+    ("bm21-long", None),   # a 140-char version is cut in the hint
+    # #BM-21, the controller (real build): the REST mock answers /api/status; the TCP bridge mock (BM21_CMD) is the Start's other side
+    ("bm21-ctl-connfail", ["--fw-version", "1.2.38"]), ("bm21-ctl-noanswer", ["--fw-version", "1.2.38"]),
+    ("bm21-ctl-linkclosed", ["--fw-version", "1.2.38"]), ("bm21-ctl-ok", ["--fw-version", "1.2.38"]),
+    ("bm21-ctl-rest-ok", ["--fw-version", "1.2.38", "--counting", "0", "--valid", "0"]),
 ]
 # scenarios that need the controller or the forms exist in the REAL build only (the source build prints n/a). On the real build each must
 # EXECUTE at least this many checks ("checks executed: N" of the harness); n/a or fewer is a failure of the suite, not a pass.
@@ -361,7 +366,7 @@ REAL_ONLY_MIN_CHECKS = {"f5-tcp-cal-n": 8, "f5-ctl-length-first": 5, "f5-form-ca
                         "fix2-stop-auto": 5, "fix2-after-wait-held": 3, "fix3-held-throws": 6, "fix3-offer-stop": 6, "fix4-joined-clear-text": 9, "bm10-adapters": 7, "bm10-schedule": 4, "bm18-chooser": 23, "bm18-choose-stale": 5,
                         "bm10-quiet-three": 2, "bm10-count-address": 2, "bm10-bind-fallback": 3, "bm10-log-sent": 4, "bm10-log-packets": 3, "fix9-reset-carry": 5, "fix9-reset-other-board": 6,
                         "console-tcp-fix10-stop-reenter": 3, "fix10-dns-chain": 3, "fix10-dns-limit": 2, "fix10-dns-good": 3, "fix10-reset-to-rest": 5,
-                        "fixr6-observe-hint": 5, "bm21-test-low": 4, "bm21-test-new": 3,
+                        "fixr6-observe-hint": 5, "bm21-test-low": 4, "bm21-test-new": 3, "bm21-ctl-connfail": 3, "bm21-ctl-noanswer": 3, "bm21-ctl-linkclosed": 3, "bm21-ctl-ok": 3, "bm21-ctl-rest-ok": 3,
                         # PR #38, TCP lane
                         "console-tcp-lane-replace": 13, "tcplane-answer-counting": 5, "tcplane-host-key": 4, "tcplane-stop-nested": 6}
 FIX_SCENARIOS = ["overtake", "restart-doc", "preset-new", "deferred-resumed", "clear-stale", "session-key",
@@ -719,6 +724,12 @@ FIXTURE = os.path.join(D, "fixtures", "spectrum_sample.json")   # a spectrum doc
 HARNESS_FILES.append(os.path.join(D, "harness", "RestFixPr37.cs"))   # PR37 fix, REST: the scenarios pr37-rest-*
 HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessFixR.cs"))   # PR #38, maintainer's REST fixes: the scenarios fixr*
 HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessBm21.cs"))   # #BM-21: the scenarios bm21-*
+HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessBm21Ctl.cs"))   # #BM-21: the scenarios bm21-ctl-* (the controller)
+# bm21-ctl-*: arguments of the TCP bridge mock (mock_cmd.py); None = no bridge, the harness gets a port nobody listens on
+BM21_CMD = {"bm21-ctl-connfail": None,
+            "bm21-ctl-noanswer": ["--stopped-at", "0", "--mute", "sta", "--period", "0.5", "--cycles", "12", "--connections", "1"],
+            "bm21-ctl-linkclosed": ["--stopped-at", "0", "--drop-cycle", "1", "--mute", "sta", "--period", "0.5", "--cycles", "12", "--connections", "2"],
+            "bm21-ctl-ok": ["--stopped-at", "0", "--period", "0.5", "--cycles", "12", "--connections", "1"]}
 HARNESS_FILES.append(os.path.join(D, "harness", "RestHarnessTcpLane.cs"))   # PR #38, TCP lane: console-tcp-lane-*, tcplane-*
 
 
@@ -785,12 +796,24 @@ def build_src(out_dir, src_dir, replacements):
     copy_fixture(out_dir)
 
 
+class _Done:
+    def __init__(self, code, text):
+        self.returncode, self.stdout, self.stderr = code, text, ""
+
+
+def run_hidden_harness(args, timeout):
+    import hidden_desktop   # tests/atomspectra/hidden_desktop.py: CreateProcess on a desktop of its own (stdout and stderr in one stream)
+    r = hidden_desktop.run_hidden(args, timeout)
+    return None if r is None else _Done(r[0], r[1])
+
+
 def run_one(build_dir, name, mock_args):
     harness = os.path.join(build_dir, "RestHarness.exe")
     port = free_port_bm10() if name.startswith("bm10-") else free_port()
     log = os.path.join(build_dir, name + "_req.jsonl")
     proc = None
     out = None
+    cmd_proc = None
     try:
         if mock_args is not None:
             out_path = os.path.join(build_dir, name + "_mock.txt")
@@ -819,8 +842,14 @@ def run_one(build_dir, name, mock_args):
                 proc.kill()
                 proc.wait(timeout=10)
                 return (False, "mock did not start")
-        args = [harness, name, str(port) if proc else "0", log if proc else "-"]
-        p = run(args, timeout=120, prio=PRIO)
+        cmd_port = 0
+        if name in BM21_CMD:
+            cmd_port = free_port()
+            if BM21_CMD[name] is not None:
+                cmd_proc = subprocess.Popen([sys.executable, "-u", os.path.join(D, "mocks", "mock_cmd.py"), "--port", str(cmd_port)] + BM21_CMD[name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=PRIO)
+                time.sleep(1.0)
+        args = [harness, name, str(port) if proc else "0", log if proc else "-"] + ([str(cmd_port)] if cmd_port else [])
+        p = run_hidden_harness(args, 120)   # the harness may open forms: on a hidden desktop, never on the desktop of the person
         if p is None:
             return (False, "harness timeout")
         text = p.stdout + (("\n[ERR] " + p.stderr) if p.stderr.strip() else "")
@@ -828,6 +857,9 @@ def run_one(build_dir, name, mock_args):
             fh.write(text)
         return (p.returncode == 0, text)
     finally:
+        if cmd_proc:
+            cmd_proc.kill()
+            cmd_proc.wait(timeout=10)
         if proc:
             proc.kill()
             proc.wait(timeout=10)
@@ -931,11 +963,13 @@ def run_real_mutations(src_dir, work_dir):
     return red == len(REAL_MUTATIONS)
 
 
+REAL_MUTATIONS.extend(bm21_mutations.REAL)   # #BM-21: the controller (TCP, REST status line)
+
 # scenarios whose checks read a text of the resources; they are run once more under each interface language (REST_UI_CULTURE),
 # so that a check that holds only for the language of the machine cannot pass here and fail elsewhere
 LOCALE_SCENARIOS = ["console-rest-notext", "console-rest-refused", "console-refresh-none", "form-bad-address", "form-calib", "form-calib-unset",
                     "gzip-unsupported", "gzip-ignored", "f5-ctl-headless-text", "pr37-rest-continue-other", "pr37-rest-observe-behind", "pr37-rest-texts",
-                    "night-start-text", "fix4-joined-clear-text", "rest-linklost-text", "rest-unreachable-text", "ui-console-confirm", "fixr6-observe-hint", "bm21-start-low", "bm21-test-low"]
+                    "night-start-text", "fix4-joined-clear-text", "rest-linklost-text", "rest-unreachable-text", "ui-console-confirm", "fixr6-observe-hint", "bm21-start-low", "bm21-test-low", "bm21-long"]
 LOCALES = ("en-US", "ru-RU")
 
 

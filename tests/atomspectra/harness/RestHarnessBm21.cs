@@ -153,8 +153,20 @@ namespace RestHarness
                     }
                     return true;
                 }
+                case "bm21-long":
+                {
+                    // a version of 140 chars (an anomaly of the board) must not push the hint out of the result label
+                    string lv = "1.2.38-" + new string('x', 133);
+                    Check(lv.Length == 140 && AtomSpectraFirmware.IsBelowRecommended(lv) == true, "a 140-char version below the threshold");
+                    string w = AtomSpectraFirmware.WarningText(lv);
+                    int w0 = AtomSpectraFirmware.WarningText("1.2.38").Length;
+                    Check(w != null && w.Length <= w0 + 40, "the hint grows by at most 40 chars (" + (w == null ? -1 : w.Length) + " vs " + w0 + ")");
+                    Check(w != null && w.Contains("1.2.38-") && w.Contains("1.2.39"), "the hint keeps the start of the version and the recommended one");
+                    Check(w != null && !w.Contains(new string('x', 40)), "the tail of the version is cut");
+                    return true;
+                }
                 default:
-                    return false;
+                    return RunBm21Ctl(scenario);
             }
         }
     }
