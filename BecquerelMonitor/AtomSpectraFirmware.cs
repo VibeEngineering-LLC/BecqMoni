@@ -15,6 +15,7 @@ namespace BecquerelMonitor
         // mDNS service _atomspectra._tcp and the board memory fix appear in 1.2.39;
         // on 1.2.38 the device search and Start may not work (REST protocol is identical).
         public const string RecommendedVersion = "1.2.39";
+        public const int MaxShownVersion = 24;   // characters of the version put into the hint
 
         private static readonly Regex VersionRegex = new Regex(
             @"^([0-9]+)\.([0-9]+)\.([0-9]+)(?:[-+_ ].*)?$",
@@ -82,7 +83,10 @@ namespace BecquerelMonitor
             if (below != true)
                 return null;
 
-            return string.Format(CultureInfo.InvariantCulture, Resources.AtomSpectraFirmwareBelow, version.Trim(), RecommendedVersion);
+            string shown = version.Trim();   // an odd long answer of the board must not push the hint out of the result label
+            if (shown.Length > MaxShownVersion)
+                shown = shown.Substring(0, MaxShownVersion) + "...";
+            return string.Format(CultureInfo.InvariantCulture, Resources.AtomSpectraFirmwareBelow, shown, RecommendedVersion);
         }
 
         public static string AppendWarning(string text, string version)
