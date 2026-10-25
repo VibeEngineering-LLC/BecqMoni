@@ -465,7 +465,7 @@ public static class UiStage8
                 S8InvokeOk(form2);
                 applyMethod.Invoke(p, new object[] { doc, rd, form2 });
 
-                // (OK marks the document for the series settings in any case; the time itself is unchanged)
+                if (!doc.Dirty) throw new Exception("OK marks the document for the series settings even when the time is the same");
                 if (p.PresetTime != 420) throw new Exception("Panel PresetTime should stay 420");
             }
             finally
