@@ -1,0 +1,22 @@
+[
+ {"id": "I01-series-clear-asks", "file": "AtomSpectraTcpDeviceController.Rest.cs",
+  "old": "bool strict = SeriesStrict(r);   // a series clears the board it started itself", "new": "bool strict = false;   // a series clears the board it started itself",
+  "note": "REST: the Clear of a series is not strict any more (the series path loses its place before the #BM-22 plan)",
+  "board": ["rest:clear_mid"], "ui": false},
+ {"id": "I02-series-clear-confirms", "file": "SeriesHost.cs",
+  "old": "_rd.MeasurementController.ClearMeasurementResult();", "new": "_rd.MeasurementController.ConfirmAndClear();",
+  "note": "the Clear between two spectra goes through the #BM-22 question",
+  "board": ["tcp:clear_mid", "rest:clear_mid"], "ui": false},
+ {"id": "I03-confirm-skipped", "file": "MeasurementController.cs",
+  "old": "if (!this.ConfirmClear())", "new": "if (false)",
+  "note": "the manual Clear asks no question",
+  "board": ["tcp:clear_alone", "rest:clear_alone"], "ui": false},
+ {"id": "I04-no-keeps-clearing", "file": "MeasurementController.cs",
+  "old": "if (!this.ConfirmClear())\n            {\n                return false;\n            }", "new": "if (!this.ConfirmClear())\n            {\n            }",
+  "note": "the answer No still clears",
+  "board": ["tcp:clear_no", "rest:clear_no"], "ui": false},
+ {"id": "I05-firmware-hint-lost", "file": "AtomSpectraTcpDeviceController.cs",
+  "old": "refusal = AtomSpectraFirmware.AppendWarning(refusal, boardFirmware);", "new": "refusal = refusal + \"\";",
+  "note": "the failed Start of a series carries no firmware hint",
+  "board": ["tcpfw:fw_connfail"], "ui": false}
+]
