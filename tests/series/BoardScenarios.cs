@@ -22,6 +22,7 @@ static partial class BoardCheck
             case "counting_refuse": S_counting_refuse(); break;
             case "counting_mid": S_counting_mid(); break;
             case "foreign_data": S_foreign_data(); break;
+            case "reuse_foreign": S_reuse_foreign(); break;
             case "observe": S_observe(); break;
             case "drop_acquiring": S_drop_acquiring(); break;
             case "sto_fail": S_sto_fail(); break;
@@ -339,5 +340,26 @@ static partial class BoardCheck
             }
         }
         catch (Exception) { return 0; }
+    }
+}
+
+static partial class BoardCheck
+{
+    // a second series on the same document: emptied by hand, the board still holds the first series' last spectrum
+    static void S_reuse_foreign()
+    {
+        Init(1, 0, 4);
+        Check(Begin(), "first series started");
+        Wait(Long);
+        Check(Series.State == SeriesState.Done && Files().Length == 1, "first series done");
+        int starts = Count("-sta");
+        Rd.EnergySpectrum.Initialize();
+        Rd.ResultDataStatus.ElapsedTime = TimeSpan.Zero;
+        Rd.ResultDataStatus.TotalTime = TimeSpan.Zero;
+        Dialogs.Clear();
+        bool started = Begin();
+        Check(!started, "the second series does not resume the measurement of the board");
+        Check(Dialogs.Contains(Txt("BoardNotReady")), "not ready dialog");
+        Check(Count("-sta") == starts && Count("-rst") == 0, "nothing was sent to the board");
     }
 }

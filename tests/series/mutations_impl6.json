@@ -10,7 +10,7 @@
  {"id": "B03-foreign-data-resumed", "file": "AtomSpectraTcpSession.cs",
   "old": "else if (plan != AtomSpectraRestStartPlan.Restart && AtomSpectraRestPolicy.BoardHasData(board) && DocumentSeconds == 0 && DocumentCounts == 0)", "new": "else if (false)",
   "note": "TCP: a stopped foreign measurement is resumed by the series",
-  "board": ["tcp:foreign_data"], "ui": false},
+  "board": ["tcp:foreign_data", "tcp:reuse_foreign"], "ui": false},
  {"id": "B04-refuse-throws-in-series", "file": "AtomSpectraTcpDeviceController.cs",
   "old": "if (SeriesStrict(resultData))", "new": "if (false)",
   "note": "TCP: a board refusal in a series is thrown/boxed instead of given to the series",

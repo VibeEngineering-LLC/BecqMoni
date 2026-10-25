@@ -29,6 +29,7 @@ SCENARIOS = [
     ("counting_refuse", "tcp", ["--initial-counting", "1", "--initial-time", "50"]),
     ("counting_mid", "tcp", ["--resume-after-sto", "1", "--resume-delay", "0.5"]),
     ("foreign_data", "tcp", ["--initial-time", "100"]),
+    ("reuse_foreign", "tcp", []),
     ("drop_acquiring", "tcp", []),
     ("sto_fail", "tcp", ["--fail-sto", "1"]),
     ("windowed_control", "tcp", []),
@@ -44,6 +45,7 @@ SCENARIOS = [
     ("delayed_start", "rest", []),
     ("counting_refuse", "rest", ["--counting", "1", "--time", "50", "--total", "1000", "--hist", "100", "--valid", "1"]),
     ("foreign_data", "rest", ["--counting", "0", "--time", "100", "--total", "5000", "--hist", "100", "--valid", "1"]),
+    ("reuse_foreign", "rest", []),
     ("observe", "rest", []),
     ("windowed_series", "rest", []),
 ]
