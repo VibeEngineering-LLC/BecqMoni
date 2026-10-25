@@ -131,7 +131,8 @@ def main():
                     "UiSeriesStage4.cs",
                     "UiSeriesStage5.cs",
                     "UiSeriesStage6.cs",
-                    "UiSeriesStage7.cs"
+                    "UiSeriesStage7.cs",
+                    "UiSeriesStage8.cs"
                 ]
                 csc_cmd = [
                     MS + r"\Roslyn\csc.exe",
