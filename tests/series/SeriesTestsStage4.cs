@@ -75,8 +75,8 @@ namespace SeriesTestRun
             }
 
             // 6. FolderTooLong checks
-            Eq(false, SeriesSettings.FolderTooLong(@"C:\" + new string('d', 198)), "FolderTooLong 200");
-            Eq(true, SeriesSettings.FolderTooLong(@"C:\" + new string('d', 199)), "FolderTooLong 201");
+            Eq(false, SeriesSettings.FolderTooLong(@"C:\" + new string('d', 197)), "FolderTooLong 200");
+            Eq(true, SeriesSettings.FolderTooLong(@"C:\" + new string('d', 198)), "FolderTooLong 201");
             Eq(false, SeriesSettings.FolderTooLong(null), "FolderTooLong null");
             Eq(false, SeriesSettings.FolderTooLong(""), "FolderTooLong empty");
         }

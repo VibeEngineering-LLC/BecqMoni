@@ -177,6 +177,7 @@ namespace BecquerelMonitor
 
             string name = sb.ToString().TrimEnd('.', ' ');
 
+            name = ShortenName(name, MaxNameLength, n);
             if (string.IsNullOrEmpty(name))
             {
                 name = "spectrum_" + n;
@@ -253,6 +254,29 @@ namespace BecquerelMonitor
             return tells ? 0 : (noOverwrite ? 1 : 2);
         }
 
+        /// <summary>Longest file name (without ".xml") a series writes; a longer one is shortened and ends with "_n".</summary>
+        public const int MaxNameLength = 200;
+
+        /// <summary>Longest series folder accepted; with it a file name of at least 37 characters still fits into the path limit.</summary>
+        public const int MaxFolderLength = 200;
+
+        private const int MaxPathLength = 250;
+
+        /// <summary>true: the folder path is too long for the series (the path of a file would pass the Windows limit).</summary>
+        public static bool FolderTooLong(string folder)
+        {
+            return folder != null && folder.Length > MaxFolderLength;
+        }
+
+        private static string ShortenName(string name, int max, int n)
+        {
+            if (name.Length <= max)
+            {
+                return name;
+            }
+            string tail = "_" + n.ToString(CultureInfo.InvariantCulture);   // the number survives: names of different spectra stay different
+            return name.Substring(0, Math.Max(0, max - tail.Length)) + tail;
+        }
         private static bool IsReservedDeviceName(string stem)
         {
             string s = stem.ToUpperInvariant();
@@ -282,6 +306,13 @@ namespace BecquerelMonitor
             }
 
             string name = BuildName(template, prefix, n, now);
+            // the whole path must stay under the Windows limit: ".xml" and a "_NNNNNN" suffix are reserved
+            int room = MaxPathLength - 8 - (folder.Length + 1) - 4;
+            if (room < 16)
+            {
+                throw new InvalidOperationException("The series folder path is too long for a file name: " + folder.Length + " characters.");
+            }
+            name = ShortenName(name, room, n);
             string plainPath = Path.Combine(folder, name + ".xml");
 
             if (!noOverwrite || exists == null || !exists(plainPath))

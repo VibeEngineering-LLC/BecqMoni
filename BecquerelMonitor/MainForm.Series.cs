@@ -12,6 +12,22 @@ namespace BecquerelMonitor
         /// </summary>
         internal Func<string, MessageBoxButtons, DialogResult> UiAsk;
 
+        /// <summary>Test seam for the "save the document?" question of the close paths (null = the application's own question).</summary>
+        internal Func<DocEnergySpectrum, bool> SaveAsk;
+
+        /// <summary>
+        /// The questions of closing a document, in ONE fixed order: the series question first, then (unless forced) the save question.
+        /// false - the user cancelled one of them, nothing was stopped.
+        /// </summary>
+        internal bool ConfirmCloseSequence(DocEnergySpectrum doc, bool force)
+        {
+            if (!this.ConfirmCloseDuringSeries(doc))
+            {
+                return false;
+            }
+            return force || (this.SaveAsk != null ? this.SaveAsk(doc) : this.ConfirmSaveDocument(doc));
+        }
+
         private bool AskSeries(string text)
         {
             if (UiAsk != null)

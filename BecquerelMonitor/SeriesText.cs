@@ -48,6 +48,7 @@ namespace BecquerelMonitor
             if (w == MeasurementSeries.WarnDiskUnknown) return T("остаток диска неизвестен", "free disk space is unknown");
             return w;
         }
+        public static string FolderTooLong => T("Путь к папке серии слишком длинный (больше 200 знаков): имя файла не поместится в предел Windows. Выберите папку покороче.", "The series folder path is too long (over 200 characters): a file name would not fit into the Windows path limit. Choose a shorter folder.");
         public static string DeleteQuestion => T("Идёт серия измерений этого спектра. Остановить серию и удалить спектр?", "The series of this spectrum is running. Stop the series and delete the spectrum?");
         public static string TemplateRefuse => T("В шаблоне имени нет {n} или {time}, а «не перезаписывать» выключено: каждый спектр затрёт предыдущий. Добавьте {n} в шаблон.", "The name template has no {n} or {time} and \"do not overwrite\" is off: every spectrum would replace the previous one. Add {n} to the template.");
         public static string TemplateWarn => T("В шаблоне имени нет {n} или {time}: файлы получат суффиксы _1, _2, … Продолжить?", "The name template has no {n} or {time}: the files will get suffixes _1, _2, ... Continue?");

@@ -308,6 +308,12 @@ namespace BecquerelMonitor
                 return;
             }
 
+            if (SeriesSettings.FolderTooLong(folder))
+            {
+                AppUi.Report(SeriesText.FolderTooLong, SeriesText.Warning, MessageBoxIcon.Warning);
+                _txtFolder.Focus();
+                return;
+            }
             string template = _txtTemplate.Text.Trim();
             if (string.IsNullOrEmpty(template))
             {

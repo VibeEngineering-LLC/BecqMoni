@@ -1792,11 +1792,11 @@ namespace BecquerelMonitor
         {
             if (this.activeDocument != null)
             {
-                if (!this.ConfirmCloseDuringSeries(this.activeDocument))   // #BM-12: закрытие из меню — тот же вопрос про серию
+                if (!this.ConfirmCloseSequence(this.activeDocument, false))   // #BM-12: вопрос про серию, затем вопрос о сохранении (порядок в одном месте)
                 {
                     return false;
                 }
-                if (this.ConfirmSaveDocument(this.activeDocument))
+                if (this.activeDocument != null)   // the save question was asked by ConfirmCloseSequence
                 {
                     if (!this.StopRecordingOrTesting(this.activeDocument, true))   // the user closes the document
                     {
@@ -1821,7 +1821,7 @@ namespace BecquerelMonitor
                 if (docEnergySpectrum.Filename == filename)
                 {
                     // the same order as the other close paths: the series question, then the save question, and only then the irreversible stop
-                    if (!this.ConfirmCloseDuringSeries(docEnergySpectrum) || !(force || this.ConfirmSaveDocument(docEnergySpectrum)))
+                    if (!this.ConfirmCloseSequence(docEnergySpectrum, force))
                     {
                         return;
                     }

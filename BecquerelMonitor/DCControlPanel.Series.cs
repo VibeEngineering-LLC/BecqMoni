@@ -313,6 +313,10 @@ namespace BecquerelMonitor
                 return false;
             }
 
+            if (!this.SeriesSettingsAccepted(rd.Series))   // IMPL-4 (F2, F4): the settings of a loaded document are checked at the start, not only in the settings window
+            {
+                return false;
+            }
             int t = this.PresetTime;
             if (t <= 0)
             {
@@ -396,6 +400,22 @@ namespace BecquerelMonitor
             }
         }
 
+        /// <summary>The same checks as the settings window (a document may carry settings that never passed it): too long folder, template that overwrites, template that gets suffixes.</summary>
+        private bool SeriesSettingsAccepted(SeriesSettings s)
+        {
+            if (SeriesSettings.FolderTooLong(s.Folder))
+            {
+                this.SeriesAsk(SeriesText.FolderTooLong, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            int problem = SeriesSettings.TemplateProblem(s.Template, s.Count, s.NoOverwrite);
+            if (problem == 2)
+            {
+                this.SeriesAsk(SeriesText.TemplateRefuse, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+            return problem != 1 || this.SeriesAsk(SeriesText.TemplateWarn, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+        }
         internal int SeriesBeforeStop(DocEnergySpectrum doc, ResultData rd, bool manual, out bool saveCurrent)
         {
             saveCurrent = false;
